@@ -1,0 +1,11 @@
+delta-rest-client>=1.0.0
+ccxt>=4.0.0
+pandas>=2.0.0
+pandas_ta>=0.3.14b
+schedule>=1.2.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+pytz>=2023.3
+websockets>=12.0
+python-telegram-bot>=20.0
+ntplib>=0.4.0
