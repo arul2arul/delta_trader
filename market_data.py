@@ -30,13 +30,14 @@ class MarketData:
         """
         symbol = symbol or config.UNDERLYING_SYMBOL
         now = datetime.now(self.ist)
-        end_ts = int(now.timestamp())
+        # Buffer end time by 1 minute to ensure it's in the past for the server
+        end_ts = int((now - timedelta(minutes=1)).timestamp())
         start_ts = int((now - timedelta(hours=count)).timestamp())
 
         try:
             data = self.client.get_candles(
                 symbol=symbol,
-                resolution="60",  # 60 minutes
+                resolution=config.CANDLE_TIMEFRAME,  # Use config (e.g., "1h")
                 start=start_ts,
                 end=end_ts,
             )
@@ -169,13 +170,18 @@ class MarketData:
                 ]
 
             # Enrich each contract with ticker data (Greeks)
+            # Fetch ALL tickers once to avoid N+1 API calls
+            all_tickers = self.client.get_all_tickers()
+            # Map product_id -> ticker
+            ticker_map = {t.get("product_id"): t for t in all_tickers if t.get("product_id")}
+            
             chain = []
             for contract in contracts:
                 product_id = contract.get("id")
                 try:
-                    ticker = self.client.get_ticker(product_id)
+                    ticker = ticker_map.get(product_id)
                     if ticker:
-                        greeks = ticker.get("greeks", {})
+                        greeks = ticker.get("greeks") or {} # Handle None
                         chain.append({
                             "product_id": product_id,
                             "symbol": contract.get("symbol", ""),
@@ -194,7 +200,7 @@ class MarketData:
                         })
                 except Exception as e:
                     logger.warning(
-                        f"Failed to get ticker for product {product_id}: {e}"
+                        f"Failed to process ticker for product {product_id}: {e}"
                     )
                     continue
 
@@ -208,20 +214,27 @@ class MarketData:
     def get_spot_price(self) -> float:
         """Get the current BTC spot/index price."""
         try:
+            # 1. Try to get index ticker directly
+            ticker = self.client.get_ticker(config.UNDERLYING_SYMBOL)
+            if ticker:
+                price = float(ticker.get("mark_price", 0))
+                logger.info(f"Current BTC price: ${price:,.2f}")
+                return price
+
+            # 2. Fallback: scan products if direct ticker fetch fails
             products = self.client.get_products()
             for p in products:
                 symbol = str(p.get("symbol", "")).upper()
                 if symbol == config.UNDERLYING_SYMBOL:
-                    ticker = self.client.get_ticker(p.get("id"))
+                    ticker = self.client.get_ticker(symbol)
                     if ticker:
-                        price = float(ticker.get("mark_price", 0))
-                        logger.info(f"Current BTC price: ${price:,.2f}")
-                        return price
-            # Fallback: get from any BTC futures
+                        return float(ticker.get("mark_price", 0))
+
+            # 3. Fallback: get from any BTC futures
             for p in products:
                 if "BTC" in str(p.get("symbol", "")).upper():
                     if p.get("contract_type") == "perpetual_futures":
-                        ticker = self.client.get_ticker(p.get("id"))
+                        ticker = self.client.get_ticker(p.get("symbol"))
                         if ticker:
                             return float(ticker.get("mark_price", 0))
             return 0.0

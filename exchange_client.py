@@ -123,19 +123,47 @@ class ExchangeClient:
     # Account
     # ──────────────────────────────────────────
     def get_wallet_balance(self) -> float:
-        """Fetch available margin/balance in INR."""
+        """Fetch available margin/balance in INR via REST API."""
         try:
             def _fetch():
-                return self._delta_client.get_balances()
+                # SDK get_balances(asset_id) requires a specific asset.
+                # Use REST endpoint to get all balances at once.
+                resp = self._delta_client.request(
+                    "GET", "/v2/wallet/balances", auth=True
+                )
+                if hasattr(resp, "json"):
+                    return resp.json()
+                return resp
 
             result = self._retry(_fetch)
-            if result and isinstance(result, list):
-                for asset in result:
-                    if asset.get("asset_symbol") == "INR":
-                        balance = float(asset.get("available_balance", 0))
-                        logger.info(f"Wallet balance: ₹{balance:,.2f}")
-                        return balance
-            logger.warning("Could not find INR balance in wallet response")
+            # Response can be a list or a dict with a 'result' key
+            balances = result
+            if isinstance(result, dict):
+                balances = result.get("result", result.get("data", []))
+
+            if isinstance(balances, list):
+                for asset in balances:
+                    symbol = asset.get("asset_symbol", asset.get("currency", ""))
+                    # Check for INR equivalent first (Delta India specific)
+                    balance_inr = float(asset.get("available_balance_inr", 0))
+                    if balance_inr > 0:
+                        logger.info(f"Wallet balance ({symbol}): ₹{balance_inr:,.2f}")
+                        return balance_inr
+
+                    # Fallback to native balance if symbol is supported
+                    if symbol.upper() in ("INR", "USDT", "BTC", "USD"):
+                        balance = float(asset.get("available_balance", asset.get("balance", 0)))
+                        if balance > 0:
+                            logger.info(f"Wallet balance ({symbol}): {balance:,.6f}")
+                            return balance
+
+            # If we got a dict directly with balance info
+            if isinstance(balances, dict):
+                balance = float(balances.get("available_balance", balances.get("balance", 0)))
+                logger.info(f"Wallet balance: {balance:,.6f}")
+                return balance
+
+            logger.warning(f"Could not parse wallet response: {type(result)}")
             return 0.0
         except Exception as e:
             logger.error(f"Failed to fetch wallet balance: {e}")
@@ -145,9 +173,15 @@ class ExchangeClient:
     # Products & Market Data Pass-through
     # ──────────────────────────────────────────
     def get_products(self):
-        """Fetch all available products."""
+        """Fetch all available products via REST."""
         def _fetch():
-            return self._delta_client.get_products()
+            resp = self._delta_client.request("GET", "/v2/products")
+            if hasattr(resp, "json"):
+                data = resp.json()
+                if isinstance(data, dict):
+                    return data.get("result", data.get("data", []))
+                return data
+            return resp
         return self._retry(_fetch)
 
     def get_product(self, product_id: int):
@@ -156,10 +190,29 @@ class ExchangeClient:
             return self._delta_client.get_product(product_id)
         return self._retry(_fetch)
 
-    def get_ticker(self, product_id: int):
-        """Fetch ticker data (includes Greeks for options)."""
+    def get_ticker(self, symbol: str):
+        """Fetch ticker for a specific symbol via REST."""
         def _fetch():
-            return self._delta_client.get_ticker(product_id)
+            # /v2/tickers/{symbol}
+            resp = self._delta_client.request("GET", f"/v2/tickers/{symbol}")
+            if hasattr(resp, "json"):
+                data = resp.json()
+                if isinstance(data, dict):
+                    return data.get("result", data.get("data", {}))
+                return data
+            return resp
+        return self._retry(_fetch)
+
+    def get_all_tickers(self):
+        """Fetch ALL tickers (efficient for Option Chain)."""
+        def _fetch():
+            resp = self._delta_client.request("GET", "/v2/tickers")
+            if hasattr(resp, "json"):
+                data = resp.json()
+                if isinstance(data, dict):
+                    return data.get("result", data.get("data", []))
+                return data
+            return resp
         return self._retry(_fetch)
 
     def get_candles(self, symbol: str, resolution: str, start: int, end: int):
@@ -184,26 +237,55 @@ class ExchangeClient:
     def place_order(self, product_id: int, size: int, side: str,
                     order_type: str = "market_order", limit_price: float = 0,
                     stop_price: float = 0):
-        """Place a single order."""
+        """Place a single order using the SDK's native methods."""
         def _place():
-            order = {
-                "product_id": product_id,
-                "size": size,
-                "side": side,
-                "order_type": order_type,
-            }
-            if order_type == "limit_order" and limit_price > 0:
-                order["limit_price"] = str(limit_price)
             if stop_price > 0:
-                order["stop_price"] = str(stop_price)
-                order["order_type"] = "stop_market_order"
-            return self._delta_client.create_order(order)
+                # Use SDK's place_stop_order for stop orders
+                return self._delta_client.place_stop_order(
+                    product_id=product_id,
+                    size=size,
+                    side=side,
+                    stop_price=str(stop_price),
+                    limit_price=str(limit_price) if limit_price > 0 else None,
+                )
+            elif order_type == "limit_order" and limit_price > 0:
+                return self._delta_client.place_order(
+                    product_id=product_id,
+                    size=size,
+                    side=side,
+                    limit_price=str(limit_price),
+                )
+            else:
+                # Market order via create_order
+                order = {
+                    "product_id": product_id,
+                    "size": size,
+                    "side": side,
+                    "order_type": "market_order",
+                }
+                return self._delta_client.create_order(order)
         return self._retry(_place)
 
     def batch_create_orders(self, orders: list):
-        """Place multiple orders in a single batch (max 5)."""
+        """
+        Place multiple orders in a single batch (max 5).
+        SDK signature: batch_create(product_id, orders)
+        All orders in a batch must be for the same product.
+        """
         def _batch():
-            return self._delta_client.batch_create(orders)
+            if not orders:
+                return []
+            # Group orders by product_id
+            by_product = {}
+            for o in orders:
+                pid = o.get("product_id")
+                by_product.setdefault(pid, []).append(o)
+
+            results = []
+            for pid, batch_orders in by_product.items():
+                result = self._delta_client.batch_create(pid, batch_orders)
+                results.append(result)
+            return results
         return self._retry(_batch)
 
     def cancel_order(self, order_id: int, product_id: int):
@@ -215,16 +297,30 @@ class ExchangeClient:
     def cancel_all_orders(self, product_id: int = None):
         """Cancel all open orders, optionally for a specific product."""
         def _cancel():
-            return self._delta_client.cancel_all_orders(product_id)
+            # Use REST endpoint - SDK doesn't have cancel_all_orders
+            payload = {}
+            if product_id:
+                payload["product_id"] = product_id
+            return self._delta_client.request(
+                "DELETE", "/v2/orders/all", payload=payload, auth=True
+            )
         return self._retry(_cancel)
 
     # ──────────────────────────────────────────
     # Positions
     # ──────────────────────────────────────────
     def get_positions(self):
-        """Fetch all open positions."""
+        """
+        Fetch all open positions via REST API.
+        SDK get_position(product_id) only fetches one product.
+        """
         def _fetch():
-            return self._delta_client.get_position()
+            resp = self._delta_client.request(
+                "GET", "/v2/positions/margined", auth=True
+            )
+            if isinstance(resp, dict):
+                return resp.get("result", resp.get("data", []))
+            return resp if isinstance(resp, list) else []
         return self._retry(_fetch)
 
     def close_position(self, product_id: int):
