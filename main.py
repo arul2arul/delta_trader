@@ -167,11 +167,16 @@ class DeltaTrader:
             iv_rank = self.market_data.get_iv_rank(chain)
             wide_wings = check_volatility(iv_rank)
 
+            # Step 5b: Fetch Spot Price for Delta $500 distance rule
+            logger.info("Step 5b: Fetching spot price...")
+            spot_price = self.market_data.get_spot_price()
+
             # Step 6: Build strategy
             logger.info("Step 6: Building strategy...")
             strategy_type, order_specs = build_strategy(
                 regime=regime,
                 chain=chain,
+                spot_price=spot_price,
                 wide_wings=wide_wings,
             )
 

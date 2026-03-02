@@ -53,18 +53,46 @@ class RiskManager:
             return True
         return False
 
-    def check_payday(self, net_profit: float) -> bool:
+    def check_payday(self, unrealized_pnl: float, max_profit: float = 0.0, hours_to_expiry: float = 24.0) -> bool:
         """
-        PayDay Exit: Once net profit hits ₹1,200 (Gross),
-        close the day and lock profits.
+        Adaptive PayDay: If Unrealized Profit > 65% of Max Profit AND Time < 1 hour to expiry, Close All.
+        Fallback to static ₹1,200 gross payday.
         """
-        if net_profit >= config.PAYDAY_GROSS:
+        if max_profit > 0 and hours_to_expiry < 1.0:
+            target = max_profit * 0.65
+            if unrealized_pnl >= target:
+                logger.info(
+                    f"💰 ADAPTIVE PAY DAY! Profit: ₹{unrealized_pnl:,.2f} "
+                    f"≥ 65% of Max Profit (₹{max_profit:,.2f}) with < 1hr to expiry. Locking profits!"
+                )
+                self._payday_triggered = True
+                return True
+
+        if unrealized_pnl >= config.PAYDAY_GROSS:
             logger.info(
-                f"💰 PAY DAY! Net profit: ₹{net_profit:,.2f} "
+                f"💰 STATIC PAY DAY! Profit: ₹{unrealized_pnl:,.2f} "
                 f"≥ ₹{config.PAYDAY_GROSS:,}. Locking profits!"
             )
             self._payday_triggered = True
             return True
+        return False
+
+    def check_flash_crash(self, recent_candle: dict) -> bool:
+        """
+        Flash Crash Protection: 
+        If price drops > 0.5% in a single 5-minute candle, close all Put Spreads!
+        """
+        if not recent_candle:
+            return False
+            
+        open_px = float(recent_candle.get("open", 0))
+        close_px = float(recent_candle.get("close", 0))
+        
+        if open_px > 0:
+            drop = (open_px - close_px) / open_px
+            if drop > 0.005:  # 0.5%
+                logger.critical(f"📉 FLASH CRASH DETECTED: {drop*100:.2f}% drop in 5m candle. Closing Put Spreads!")
+                return True
         return False
 
     def check_leg_breach(
@@ -146,6 +174,9 @@ class RiskManager:
         unrealized_pnl: float,
         realized_pnl: float,
         current_price: float,
+        max_profit: float = 0.0,
+        hours_to_expiry: float = 24.0,
+        recent_5m_candle: dict = None,
     ) -> tuple[RiskAction, dict]:
         """
         Master risk evaluation. Checks all conditions in priority order:
@@ -167,8 +198,16 @@ class RiskManager:
                 "unrealized_pnl": unrealized_pnl,
             }
 
-        # 2. PayDay Exit
-        if self.check_payday(total_pnl):
+        # 1.5 Flash Crash Protection
+        if recent_5m_candle and self.check_flash_crash(recent_5m_candle):
+            # Flash crash affects Put spreads typically, but acting as a kill switch
+            return RiskAction.KILL, {
+                "reason": "Flash crash detected (price drop > 0.5% in 5m)",
+                "unrealized_pnl": unrealized_pnl,
+            }
+
+        # 2. PayDay Exit (Adaptive or Static)
+        if self.check_payday(total_pnl, max_profit=max_profit, hours_to_expiry=hours_to_expiry):
             return RiskAction.PAYDAY, {
                 "reason": "Daily profit target reached",
                 "total_pnl": total_pnl,

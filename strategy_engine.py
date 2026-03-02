@@ -20,6 +20,7 @@ logger = logging.getLogger("strategy_engine")
 
 def build_iron_condor(
     chain: list[dict],
+    spot_price: float = 0.0,
     wide_wings: bool = False,
     lot_size: int = 1,
 ) -> list[OrderSpec]:
@@ -40,7 +41,7 @@ def build_iron_condor(
     Returns:
         List of 4 OrderSpec objects.
     """
-    strikes = select_iron_condor_strikes(chain, wide_wings=wide_wings)
+    strikes = select_iron_condor_strikes(chain, spot_price=spot_price, wide_wings=wide_wings)
 
     orders = []
     leg_configs = [
@@ -95,6 +96,7 @@ def build_iron_condor(
 def build_credit_spread(
     chain: list[dict],
     direction: str,
+    spot_price: float = 0.0,
     wide_wings: bool = False,
     lot_size: int = 1,
 ) -> list[OrderSpec]:
@@ -119,7 +121,7 @@ def build_credit_spread(
         List of 2 OrderSpec objects.
     """
     strikes = select_credit_spread_strikes(
-        chain, direction=direction, wide_wings=wide_wings
+        chain, direction=direction, spot_price=spot_price, wide_wings=wide_wings
     )
 
     orders = []
@@ -175,6 +177,7 @@ def build_credit_spread(
 def build_strategy(
     regime: Regime,
     chain: list[dict],
+    spot_price: float = 0.0,
     wide_wings: bool = False,
     lot_size: int = 1,
 ) -> tuple[StrategyType, list[OrderSpec]]:
@@ -192,21 +195,21 @@ def build_strategy(
     """
     if regime == Regime.SIDEWAYS:
         strategy_type = StrategyType.IRON_CONDOR
-        orders = build_iron_condor(chain, wide_wings=wide_wings, lot_size=lot_size)
+        orders = build_iron_condor(chain, spot_price=spot_price, wide_wings=wide_wings, lot_size=lot_size)
     elif regime == Regime.BULLISH:
         strategy_type = StrategyType.BULL_CREDIT_SPREAD
         orders = build_credit_spread(
-            chain, direction="bullish", wide_wings=wide_wings, lot_size=lot_size
+            chain, direction="bullish", spot_price=spot_price, wide_wings=wide_wings, lot_size=lot_size
         )
     elif regime == Regime.BEARISH:
         strategy_type = StrategyType.BEAR_CREDIT_SPREAD
         orders = build_credit_spread(
-            chain, direction="bearish", wide_wings=wide_wings, lot_size=lot_size
+            chain, direction="bearish", spot_price=spot_price, wide_wings=wide_wings, lot_size=lot_size
         )
     else:
         logger.warning(f"Unknown regime {regime}, defaulting to Iron Condor")
         strategy_type = StrategyType.IRON_CONDOR
-        orders = build_iron_condor(chain, wide_wings=wide_wings, lot_size=lot_size)
+        orders = build_iron_condor(chain, spot_price=spot_price, wide_wings=wide_wings, lot_size=lot_size)
 
     logger.info(
         f"Strategy: {strategy_type.value} | "

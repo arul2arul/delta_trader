@@ -1,5 +1,5 @@
 """
-Technical Indicators – RSI, EMA, ADX via pandas_ta.
+Technical Indicators – RSI, EMA, ADX, VWAP, ATR via pandas_ta.
 Pure functions that accept DataFrames and return augmented DataFrames.
 """
 
@@ -62,13 +62,11 @@ def compute_adx(df: pd.DataFrame, period: int = config.ADX_PERIOD) -> pd.DataFra
     df = df.copy()
     adx_df = ta.adx(df["high"], df["low"], df["close"], length=period)
     if adx_df is not None and not adx_df.empty:
-        # pandas_ta returns ADX_14, DMP_14, DMN_14
         adx_col = f"ADX_{period}"
         if adx_col in adx_df.columns:
             df["adx"] = adx_df[adx_col]
             logger.info(f"ADX({period}) computed. Latest: {df['adx'].iloc[-1]:.2f}")
         else:
-            # Try first column
             df["adx"] = adx_df.iloc[:, 0]
             logger.info(f"ADX({period}) computed (fallback column)")
     else:
@@ -77,19 +75,89 @@ def compute_adx(df: pd.DataFrame, period: int = config.ADX_PERIOD) -> pd.DataFra
     return df
 
 
+def compute_atr(df: pd.DataFrame, period: int = getattr(config, "ATR_PERIOD", 14)) -> pd.DataFrame:
+    """
+    Compute ATR (Average True Range).
+    Adds 'atr' column to the DataFrame.
+    """
+    if df.empty:
+        logger.warning("Cannot compute ATR: empty DataFrame")
+        return df
+
+    required = ["high", "low", "close"]
+    for col in required:
+        if col not in df.columns:
+            logger.warning(f"Cannot compute ATR: missing '{col}' column")
+            return df
+
+    df = df.copy()
+    atr_val = ta.atr(df["high"], df["low"], df["close"], length=period)
+    if atr_val is not None and not atr_val.empty:
+        df["atr"] = atr_val
+        logger.info(f"ATR({period}) computed. Latest: {df['atr'].iloc[-1]:.2f}")
+    else:
+        df["atr"] = pd.Series([0.0] * len(df))
+        logger.warning("ATR computation returned empty result")
+
+    return df
+
+
+def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute VWAP (Volume Weighted Average Price).
+    Adds 'vwap' column to the DataFrame.
+    Using pandas_ta vwap requires a datetime index typically, so we set it temporarily if needed.
+    """
+    if df.empty:
+        logger.warning("Cannot compute VWAP: empty DataFrame")
+        return df
+
+    required = ["high", "low", "close", "volume"]
+    for col in required:
+        if col not in df.columns:
+            logger.warning(f"Cannot compute VWAP: missing '{col}' column")
+            return df
+
+    df = df.copy()
+
+    # pandas_ta vwap uses index, let's ensure index is datetime if possible
+    temp_df = df.copy()
+    if "timestamp" in temp_df.columns:
+        temp_df.index = pd.to_datetime(temp_df["timestamp"], unit='s' if temp_df["timestamp"].dtype in ['int64', 'float64'] else None)
+    
+    try:
+        vwap_val = ta.vwap(temp_df["high"], temp_df["low"], temp_df["close"], temp_df["volume"])
+        if vwap_val is not None and not vwap_val.empty:
+            df["vwap"] = vwap_val.values
+            logger.info(f"VWAP computed. Latest: {df['vwap'].iloc[-1]:.2f}")
+        else:
+            df["vwap"] = pd.Series([df["close"].iloc[-1]] * len(df))
+            logger.warning("VWAP empty, fallback to close price")
+    except Exception as e:
+        logger.error(f"VWAP calculation failed: {e}. Fallback to close price.")
+        df["vwap"] = df["close"]
+
+    return df
+
+
 def compute_all(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute all indicators (RSI, EMA, ADX) in one pass.
+    Compute all indicators (RSI, EMA, ADX, ATR, VWAP) in one pass.
     Returns augmented DataFrame.
     """
     df = compute_rsi(df)
     df = compute_ema(df)
     df = compute_adx(df)
+    df = compute_atr(df)
+    df = compute_vwap(df)
 
     logger.info(
         f"All indicators computed. "
         f"RSI={df['rsi'].iloc[-1]:.1f}, "
         f"EMA={df.get(f'ema_{config.EMA_PERIOD}', pd.Series([0])).iloc[-1]:.1f}, "
-        f"ADX={df.get('adx', pd.Series([0])).iloc[-1]:.1f}"
+        f"ADX={df.get('adx', pd.Series([0])).iloc[-1]:.1f}, "
+        f"ATR={df.get('atr', pd.Series([0])).iloc[-1]:.1f}, "
+        f"VWAP={df.get('vwap', pd.Series([0])).iloc[-1]:.1f}"
     )
     return df
+

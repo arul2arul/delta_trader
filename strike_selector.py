@@ -1,5 +1,5 @@
 """
-Strike Selector – Finds option strikes closest to target delta values.
+Strike Selector – Finds option strikes closest to target delta values and incorporates Greek targeting.
 """
 
 import logging
@@ -11,23 +11,18 @@ from config import Strike, OptionType
 logger = logging.getLogger("strike_selector")
 
 
-def select_by_delta(
+def select_best_strike(
     chain: list[dict],
-    target_delta: float,
+    max_delta: float,
     option_type: str,
+    spot_price: float = 0.0,
+    min_distance: float = 0.0,
+    maximize_theta: bool = True
 ) -> Optional[Strike]:
     """
-    Find the strike in the option chain closest to the target delta.
-
-    Args:
-        chain: List of option dicts with 'delta', 'strike_price', etc.
-        target_delta: Absolute delta value to target (e.g., 0.10).
-        option_type: "call_options" or "put_options".
-
-    Returns:
-        Strike namedtuple or None if no suitable strike found.
+    Find the best strike prioritizing minimum distance, strictly under max delta,
+    and optionally maximizing Theta (our "Daily Wage").
     """
-    # Filter chain by option type
     filtered = [
         c for c in chain
         if c.get("contract_type", "").lower() == option_type.lower()
@@ -37,23 +32,42 @@ def select_by_delta(
         logger.warning(f"No {option_type} contracts found in chain")
         return None
 
-    # For puts, delta is negative; we compare absolute values
-    best = None
-    best_diff = float("inf")
-
+    candidates = []
     for opt in filtered:
         opt_delta = abs(float(opt.get("delta", 0)))
-        diff = abs(opt_delta - target_delta)
+        strike_price = float(opt.get("strike_price", 0))
 
-        if diff < best_diff:
-            best_diff = diff
-            best = opt
+        # 1. Enforce minimum distance from spot price (prioritized over delta)
+        if min_distance > 0 and spot_price > 0:
+            if abs(strike_price - spot_price) < min_distance:
+                continue
+                
+        # 2. Enforce strict maximum delta risk (e.g. 0.15)
+        if opt_delta > max_delta:
+            continue
+            
+        # 3. Liquidity Filter (Slippage Guard)
+        bid = float(opt.get("best_bid", 0))
+        ask = float(opt.get("best_ask", 0))
+        mark = float(opt.get("mark_price", 0))
+        if mark > 0 and (ask - bid) / mark > 0.02:
+            # Spread > 2% of mark price
+            continue
 
-    if best is None:
+        candidates.append(opt)
+
+    if not candidates:
         logger.warning(
-            f"No strike found for delta={target_delta} in {option_type}"
+            f"No strike found for {option_type} under delta {max_delta} "
+            f"and distance >= {min_distance}."
         )
         return None
+
+    # Maximize Theta ("Daily Wage") among candidates, or fallback to closest delta
+    if maximize_theta:
+        best = max(candidates, key=lambda x: abs(float(x.get("theta", 0))))
+    else:
+        best = min(candidates, key=lambda x: abs(abs(float(x.get("delta", 0))) - max_delta))
 
     strike = Strike(
         product_id=int(best.get("product_id", 0)),
@@ -64,56 +78,54 @@ def select_by_delta(
         symbol=best.get("symbol", ""),
     )
 
+    gamma = float(best.get("gamma", 0))
+    vega = float(best.get("vega", 0))
+    theta = float(best.get("theta", 0))
+
     logger.info(
         f"Selected {option_type} strike: "
         f"K={strike.strike_price:.0f}, "
-        f"Δ={strike.delta:.4f} (target={target_delta}), "
+        f"Δ={strike.delta:.4f} (max={max_delta}), "
         f"Premium={strike.premium:.4f}, "
-        f"ID={strike.product_id}"
+        f"Θ={theta:.5f}, Γ={gamma:.5f}, V={vega:.5f}"
     )
     return strike
 
 
 def select_iron_condor_strikes(
     chain: list[dict],
+    spot_price: float = 0.0,
     wide_wings: bool = False,
 ) -> dict:
     """
-    Select all 4 strikes for an Iron Condor.
-
-    Returns dict with keys: short_call, short_put, long_call, long_put.
-    Each value is a Strike or None.
+    Select 4 strikes for an Iron Condor.
+    Short legs target standard delta, long legs serve as wing protection.
     """
     short_delta = config.SHORT_DELTA
     long_delta = config.LONG_DELTA
+    
+    # Iron Condor is generally delta neutral, we prioritize theta on short legs
+    # Distance checking isn't as strictly necessary as directional spreads, but we pass it.
+    min_dist = 500.0 if spot_price > 0 else 0.0
 
-    # If wide wings (high IV), widen the gap
     if wide_wings:
-        long_delta = max(0.02, long_delta - 0.02)  # Push wings further OTM
-        logger.info(
-            f"Wide wings mode: short_delta={short_delta}, long_delta={long_delta}"
-        )
+        long_delta = max(0.02, long_delta - 0.02)
+        logger.info(f"Wide wings mode: short_delta={short_delta}, long_delta={long_delta}")
 
     strikes = {
-        "short_call": select_by_delta(chain, short_delta, OptionType.CALL.value),
-        "short_put": select_by_delta(chain, short_delta, OptionType.PUT.value),
-        "long_call": select_by_delta(chain, long_delta, OptionType.CALL.value),
-        "long_put": select_by_delta(chain, long_delta, OptionType.PUT.value),
+        "short_call": select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True),
+        "short_put": select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True),
+        "long_call": select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False),
+        "long_put": select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False),
     }
 
-    # Validate: long wings must be further OTM than short legs
+    # Validate wing logic
     if strikes["short_call"] and strikes["long_call"]:
         if strikes["long_call"].strike_price <= strikes["short_call"].strike_price:
-            logger.warning(
-                "Long call wing is not further OTM than short call. "
-                "Adjusting to next available strike."
-            )
+            logger.warning("Long call wing is not further OTM. Adjusting fallback...")
     if strikes["short_put"] and strikes["long_put"]:
         if strikes["long_put"].strike_price >= strikes["short_put"].strike_price:
-            logger.warning(
-                "Long put wing is not further OTM than short put. "
-                "Adjusting to next available strike."
-            )
+            logger.warning("Long put wing is not further OTM. Adjusting fallback...")
 
     valid_count = sum(1 for v in strikes.values() if v is not None)
     logger.info(f"Iron Condor strike selection: {valid_count}/4 legs found")
@@ -123,39 +135,31 @@ def select_iron_condor_strikes(
 def select_credit_spread_strikes(
     chain: list[dict],
     direction: str,
+    spot_price: float = 0.0,
     wide_wings: bool = False,
 ) -> dict:
     """
-    Select strikes for a directional Credit Spread.
-
-    Args:
-        direction: "bullish" or "bearish"
-        wide_wings: Use wider gap between legs
-
-    Returns dict with keys: short_leg, long_leg.
+    Select strikes for a directional Credit Spread, enforcing the $500 min distance
+    and prioritizing max Theta for the short leg.
     """
     short_delta = config.DIRECTIONAL_DELTA
     long_delta = config.WING_DELTA
+    min_dist = 500.0 if spot_price > 0 else 0.0
 
     if wide_wings:
         long_delta = max(0.02, long_delta - 0.02)
 
     if direction == "bullish":
-        # Bull Put Spread: Sell higher-delta put, Buy lower-delta put
         strikes = {
-            "short_leg": select_by_delta(chain, short_delta, OptionType.PUT.value),
-            "long_leg": select_by_delta(chain, long_delta, OptionType.PUT.value),
+            "short_leg": select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True),
+            "long_leg": select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False),
         }
     else:
-        # Bear Call Spread: Sell higher-delta call, Buy lower-delta call
         strikes = {
-            "short_leg": select_by_delta(chain, short_delta, OptionType.CALL.value),
-            "long_leg": select_by_delta(chain, long_delta, OptionType.CALL.value),
+            "short_leg": select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True),
+            "long_leg": select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False),
         }
 
     valid_count = sum(1 for v in strikes.values() if v is not None)
-    logger.info(
-        f"{direction.title()} credit spread strike selection: "
-        f"{valid_count}/2 legs found"
-    )
+    logger.info(f"{direction.title()} credit spread strike selection: {valid_count}/2 legs found")
     return strikes
