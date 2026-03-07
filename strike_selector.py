@@ -41,6 +41,15 @@ def select_best_strike(
         if min_distance > 0 and spot_price > 0:
             if abs(strike_price - spot_price) < min_distance:
                 continue
+
+        # 1.5 Round Number Magnet Filter ($1k round number safety)
+        if spot_price > 0:
+            nearest_round = round(spot_price / 1000) * 1000
+            if abs(spot_price - nearest_round) <= 500:
+                # Price is hovering within $500 of a major round number.
+                if abs(strike_price - nearest_round) < 1000:
+                    # Strike must be at least $1000 away from the major round number!
+                    continue
                 
         # 2. Enforce strict maximum delta risk (e.g. 0.15)
         if opt_delta > max_delta:

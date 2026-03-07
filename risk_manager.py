@@ -58,12 +58,12 @@ class RiskManager:
         Adaptive PayDay: If Unrealized Profit > 65% of Max Profit AND Time < 1 hour to expiry, Close All.
         Fallback to static ₹1,200 gross payday.
         """
-        if max_profit > 0 and hours_to_expiry < 1.0:
-            target = max_profit * 0.65
+        if max_profit > 0 and hours_to_expiry < 1.5:  # Changed to 90m for Gamma edge
+            target = max_profit * 0.60  # Changed to 60% Early Harvest
             if unrealized_pnl >= target:
                 logger.info(
-                    f"💰 ADAPTIVE PAY DAY! Profit: ₹{unrealized_pnl:,.2f} "
-                    f"≥ 65% of Max Profit (₹{max_profit:,.2f}) with < 1hr to expiry. Locking profits!"
+                    f"💰 EARLY HARVEST! Profit: ₹{unrealized_pnl:,.2f} "
+                    f"≥ 60% of Max Profit (₹{max_profit:,.2f}) with < 90m to expiry. Locking profits to avoid Gamma risk!"
                 )
                 self._payday_triggered = True
                 return True
@@ -216,23 +216,33 @@ class RiskManager:
         # 3. Leg Breach
         breached = self.check_leg_breach(positions, current_price)
         if breached:
-            return RiskAction.ROLL_LEG, {
-                "reason": "Short leg breached",
-                "breached_products": breached,
-                "current_price": current_price,
+            # Check for Patience Timer
+            patience_active = False
+            for pos in positions:
+                size = int(pos.get("size", 0))
+                strike = float(pos.get("strike_price", 0))
+                if size < 0 and strike > 0 and abs(current_price - strike) > 600 and unrealized_pnl < 0:
+                    patience_active = True
+            
+            if patience_active:
+                logger.info("⏳ Patience Timer Active: Drawdown < 0 but price is >$600 from short strike. Waiting...")
+                return RiskAction.HOLD, {"reason": "Patience timer active"}
+            
+            return RiskAction.KILL, {
+                "reason": "Anti-Legging Logic: Leg breached, closing ALL baskets atomically.",
+                "total_pnl": total_pnl,
             }
 
-        # 4. Per-Leg Stop Loss
+        # 4. Per-Leg Stop Loss -> Upgraded to Basket Stop Loss (Anti-Legging logic)
         for pos in positions:
             product_id = pos.get("product_id")
             option_price = float(pos.get("mark_price", 0))
             size = int(pos.get("size", 0))
 
             if size < 0 and self.check_stop_loss(product_id, option_price):
-                return RiskAction.STOP_LEG, {
-                    "reason": "Per-leg stop loss triggered",
-                    "product_id": product_id,
-                    "option_price": option_price,
+                return RiskAction.KILL, {
+                    "reason": "Anti-Legging Logic: Per-leg stop loss hit, closing ALL baskets atomically.",
+                    "total_pnl": total_pnl,
                 }
 
         # 5. All clear

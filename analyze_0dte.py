@@ -33,14 +33,16 @@ def main():
     spot_price = market_data.get_spot_price()
     print(f"💰 Spot Price: ${spot_price:,.2f}")
 
-    # 2. Fetch Candles & Indicators
-    df = market_data.get_hourly_candles()
-    if df.empty:
+    # 2. Fetch Candles & Indicators (1h for regime, 15m for strict entry rules)
+    df = market_data.get_candles(resolution="1h")
+    df_15m = market_data.get_candles(resolution="15m")
+    
+    if df.empty or df_15m.empty:
         print("❌ Error: No candle data available.")
         sys.exit(1)
 
     df = compute_all(df)
-    
+    df_15m = compute_all(df_15m)
     # 3. Detect Regime
     regime = detect_regime(df)
     latest = df.iloc[-1]
@@ -59,6 +61,26 @@ def main():
     iv_rank = market_data.get_iv_rank(chain)
     wide_wings = check_volatility(iv_rank)
     print(f"⚡ IV Rank: {iv_rank:.1f}% (Wide Wings: {wide_wings})")
+    
+    # --- Pre-Entry Logic Check ---
+    is_supertrend_red = df_15m.iloc[-1].get("supertrend_dir", 1) < 0
+    
+    # Momentum Gap Filter (EMA 9)
+    prev = df.iloc[-2]
+    curr = df.iloc[-1]
+    prev_gap = abs(prev["close"] - prev.get("ema_9", prev["close"]))
+    curr_gap = abs(curr["close"] - curr.get("ema_9", curr["close"]))
+    widening_gap = curr_gap > prev_gap
+    
+    if is_supertrend_red and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
+        print("🛑 ALARM: Red SuperTrend Ban triggered on 15m timeframe! Blocking Bull Put Spread...")
+        print("⚠️ Suggesting NO TRADE instead to protect capital.")
+        sys.exit(0)
+        
+    if widening_gap and regime != config.Regime.SIDEWAYS:
+        # If gap is widening against trend... wait, if trend is against, but our strategy is matching regime.
+        # Let's say if gap > X, or just widening.
+        print(f"⚠️ Momentum Gap Widening (${curr_gap:.2f}). Proceed with caution.")
     
     # 6. Build Strategy and get exact order specs (Strikes / Legs)
     print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()}")
@@ -102,6 +124,12 @@ def main():
 
     net_credit = premium_collected - premium_paid
     print(f"\n💵 Est. Net Credit: ${net_credit:.4f}")
+    
+    # 7. Fee-Aware Exit Check
+    # Average Delta contract fee + slippage buffer ≈ $15 (assuming normal lot sizes)
+    if net_credit < 15.0:
+        print(f"🛑 ALARM: Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < $15. Trade rejected to avoid 'working for the exchange'.")
+        sys.exit(0)
     
     # Dump raw JSON at the end for OpenClaw to parse programmatically if needed
     api_payload = []

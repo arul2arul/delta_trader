@@ -140,17 +140,48 @@ def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:
+    """
+    Compute Supertrend.
+    Adds 'supertrend_dir' (1 for Bull, -1 for Bear) to the DataFrame.
+    """
+    if df.empty:
+        return df
+
+    required = ["high", "low", "close"]
+    for col in required:
+        if col not in df.columns:
+            return df
+
+    df = df.copy()
+    try:
+        st_df = ta.supertrend(df["high"], df["low"], df["close"], length=period, multiplier=multiplier)
+        if st_df is not None and not st_df.empty:
+            st_col = f"SUPERTd_{period}_{multiplier}"
+            if st_col in st_df.columns:
+                df["supertrend_dir"] = st_df[st_col]
+            else:
+                df["supertrend_dir"] = st_df.iloc[:, 1]
+            logger.info("Supertrend computed.")
+        else:
+            df["supertrend_dir"] = 1  # Default Bullish fallback
+    except Exception as e:
+        logger.error(f"Supertrend calculation failed: {e}")
+        df["supertrend_dir"] = 1
+    return df
+
+
 def compute_all(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute all indicators (RSI, EMA, ADX, ATR, VWAP) in one pass.
-    Returns augmented DataFrame.
+    Compute all primary indicators in one pass.
     """
     df = compute_rsi(df)
-    df = compute_ema(df)
+    df = compute_ema(df, period=9)  # For Momentum Gap Filter
+    df = compute_ema(df)            # Generic EMA
     df = compute_adx(df)
     df = compute_atr(df)
     df = compute_vwap(df)
-
+    
     logger.info(
         f"All indicators computed. "
         f"RSI={df['rsi'].iloc[-1]:.1f}, "

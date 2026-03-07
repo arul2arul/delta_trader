@@ -22,8 +22,8 @@ class MarketData:
         self.client = exchange_client
         self.ist = pytz.timezone(config.TIMEZONE)
 
-    def get_hourly_candles(self, symbol: str = None,
-                           count: int = config.CANDLE_COUNT) -> pd.DataFrame:
+    def get_candles(self, symbol: str = None,
+                           count: int = config.CANDLE_COUNT, resolution: str = config.CANDLE_TIMEFRAME) -> pd.DataFrame:
         """
         Fetch the last `count` hourly candles for a symbol.
         Returns DataFrame with columns: timestamp, open, high, low, close, volume.
@@ -37,7 +37,7 @@ class MarketData:
         try:
             data = self.client.get_candles(
                 symbol=symbol,
-                resolution=config.CANDLE_TIMEFRAME,  # Use config (e.g., "1h")
+                resolution=resolution,
                 start=start_ts,
                 end=end_ts,
             )
@@ -79,11 +79,11 @@ class MarketData:
             if "timestamp" in df.columns:
                 df = df.sort_values("timestamp").reset_index(drop=True)
 
-            logger.info(f"Fetched {len(df)} hourly candles for {symbol}")
+            logger.info(f"Fetched {len(df)} {resolution} candles for {symbol}")
             return df
 
         except Exception as e:
-            logger.error(f"Failed to fetch candles for {symbol}: {e}")
+            logger.error(f"Failed to fetch {resolution} candles for {symbol}: {e}")
             return pd.DataFrame()
 
     def get_btc_daily_contract(self) -> dict | None:
