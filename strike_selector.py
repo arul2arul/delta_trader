@@ -17,7 +17,9 @@ def select_best_strike(
     option_type: str,
     spot_price: float = 0.0,
     min_distance: float = 0.0,
-    maximize_theta: bool = True
+    maximize_theta: bool = True,
+    strictly_greater_than: Optional[float] = None,
+    strictly_less_than: Optional[float] = None
 ) -> Optional[Strike]:
     """
     Find the best strike prioritizing minimum distance, strictly under max delta,
@@ -50,6 +52,12 @@ def select_best_strike(
                 if abs(strike_price - nearest_round) < 1000:
                     # Strike must be at least $1000 away from the major round number!
                     continue
+                    
+        # 1.6 Strict Boundary Filters for Long Wings to prevent overlaps
+        if strictly_greater_than is not None and strike_price <= strictly_greater_than:
+            continue
+        if strictly_less_than is not None and strike_price >= strictly_less_than:
+            continue
                 
         # 2. Enforce strict maximum delta risk (e.g. 0.15)
         if opt_delta > max_delta:
@@ -121,23 +129,31 @@ def select_iron_condor_strikes(
         long_delta = max(0.02, long_delta - 0.02)
         logger.info(f"Wide wings mode: short_delta={short_delta}, long_delta={long_delta}")
 
+    short_call = select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True)
+    short_put = select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True)
+
+    long_call = None
+    if short_call:
+        long_call = select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False, strictly_greater_than=short_call.strike_price)
+    
+    long_put = None
+    if short_put:
+        long_put = select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False, strictly_less_than=short_put.strike_price)
+
     strikes = {
-        "short_call": select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True),
-        "short_put": select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True),
-        "long_call": select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False),
-        "long_put": select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False),
+        "short_call": short_call,
+        "short_put": short_put,
+        "long_call": long_call,
+        "long_put": long_put,
     }
 
-    # Validate wing logic
-    if strikes["short_call"] and strikes["long_call"]:
-        if strikes["long_call"].strike_price <= strikes["short_call"].strike_price:
-            logger.warning("Long call wing is not further OTM. Adjusting fallback...")
-    if strikes["short_put"] and strikes["long_put"]:
-        if strikes["long_put"].strike_price >= strikes["short_put"].strike_price:
-            logger.warning("Long put wing is not further OTM. Adjusting fallback...")
-
-    valid_count = sum(1 for v in strikes.values() if v is not None)
-    logger.info(f"Iron Condor strike selection: {valid_count}/4 legs found")
+    # Validate that ALL 4 legs were successfully found and don't overlap
+    if not all(strikes.values()):
+        missing = [k for k, v in strikes.items() if v is None]
+        logger.error(f"🛑 ABORTING IRON CONDOR: Could not find valid strikes for {missing}. Chain may be sparse or wings overlapping. Preventing incomplete execution.")
+        return {}
+        
+    logger.info(f"Iron Condor strike selection: 4/4 legs securely found with no overlap")
     return strikes
 
 
@@ -159,16 +175,25 @@ def select_credit_spread_strikes(
         long_delta = max(0.02, long_delta - 0.02)
 
     if direction == "bullish":
-        strikes = {
-            "short_leg": select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True),
-            "long_leg": select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False),
-        }
+        short_leg = select_best_strike(chain, short_delta, OptionType.PUT.value, spot_price, min_dist, maximize_theta=True)
+        long_leg = None
+        if short_leg:
+            long_leg = select_best_strike(chain, long_delta, OptionType.PUT.value, spot_price, min_dist + 500, maximize_theta=False, strictly_less_than=short_leg.strike_price)
     else:
-        strikes = {
-            "short_leg": select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True),
-            "long_leg": select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False),
-        }
+        short_leg = select_best_strike(chain, short_delta, OptionType.CALL.value, spot_price, min_dist, maximize_theta=True)
+        long_leg = None
+        if short_leg:
+            long_leg = select_best_strike(chain, long_delta, OptionType.CALL.value, spot_price, min_dist + 500, maximize_theta=False, strictly_greater_than=short_leg.strike_price)
 
-    valid_count = sum(1 for v in strikes.values() if v is not None)
-    logger.info(f"{direction.title()} credit spread strike selection: {valid_count}/2 legs found")
+    strikes = {
+        "short_leg": short_leg,
+        "long_leg": long_leg,
+    }
+
+    if not all(strikes.values()):
+        missing = [k for k, v in strikes.items() if v is None]
+        logger.error(f"🛑 ABORTING CREDIT SPREAD: Could not find valid strikes for {missing}. Chain may be sparse or wings overlapping. Preventing incomplete execution.")
+        return {}
+
+    logger.info(f"{direction.title()} credit spread strike selection: 2/2 legs securely found with no overlap")
     return strikes
