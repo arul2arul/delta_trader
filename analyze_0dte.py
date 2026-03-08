@@ -41,8 +41,8 @@ def main():
     market_data = MarketData(exchange)
 
     POLL_INTERVAL_SEC = 5 * 60  # 5 minutes
-    START_HOUR = 12             # 12:00 PM IST
-    CUTOFF_HOUR = 13            # 1:00 PM IST
+    START_HOUR = 11             # Temporarily set to 11:00 AM IST for testing (was 12)
+    CUTOFF_HOUR = 23            # Temporarily set to 23:00 PM IST for testing (was 13)
     CUTOFF_MINUTE = 45          # 1:45 PM IST
 
     while True:
