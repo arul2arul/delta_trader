@@ -246,13 +246,19 @@ def main():
         # Dump raw JSON at the end for OpenClaw to parse programmatically if needed
         api_payload = []
         for leg in order_specs:
-            api_payload.append({
+            leg_dict = {
                 "product_id": leg.product_id,
                 "side": leg.side,
                 "size": leg.size,
                 "order_type": leg.order_type,
                 "limit_price": leg.limit_price
-            })
+            }
+            # Only attach Stop Loss and Take Profit bounds for the naked Short Legs
+            if leg.side == "sell":
+                leg_dict["stop_loss_price"] = round(leg.limit_price * config.STOPLOSS_MULTIPLIER, 2)
+                leg_dict["take_profit_price"] = round(leg.limit_price * 0.10, 2)
+                
+            api_payload.append(leg_dict)
 
         print("\n--- OPENCLAW JSON PAYLOAD ---")
         payload_str = json.dumps({
