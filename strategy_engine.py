@@ -57,11 +57,13 @@ def build_iron_condor(
             logger.error(f"Missing strike for {key} – cannot build Iron Condor")
             return []
 
+        order_type = "market_order" if side == OrderSide.BUY.value else "limit_order"
+        
         order = OrderSpec(
             product_id=strike.product_id,
             side=side,
             size=lot_size,
-            order_type="limit_order",
+            order_type=order_type,
             limit_price=strike.premium,
             strike_price=strike.strike_price,
             option_type=strike.option_type,
@@ -153,7 +155,7 @@ def build_credit_spread(
         product_id=long_strike.product_id,
         side=OrderSide.BUY.value,
         size=lot_size,
-        order_type="limit_order",
+        order_type="market_order",  # Use market order to guarantee wing protection fill
         limit_price=long_strike.premium,
         strike_price=long_strike.strike_price,
         option_type=long_strike.option_type,
