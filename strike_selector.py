@@ -115,7 +115,7 @@ def select_iron_condor_strikes(
     
     # Iron Condor is generally delta neutral, we prioritize theta on short legs
     # Distance checking isn't as strictly necessary as directional spreads, but we pass it.
-    min_dist = 500.0 if spot_price > 0 else 0.0
+    min_dist = 1000.0 if spot_price > 0 else 0.0
 
     if wide_wings:
         long_delta = max(0.02, long_delta - 0.02)
@@ -153,7 +153,7 @@ def select_credit_spread_strikes(
     """
     short_delta = config.DIRECTIONAL_DELTA
     long_delta = config.WING_DELTA
-    min_dist = 500.0 if spot_price > 0 else 0.0
+    min_dist = 1000.0 if spot_price > 0 else 0.0
 
     if wide_wings:
         long_delta = max(0.02, long_delta - 0.02)

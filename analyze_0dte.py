@@ -32,12 +32,29 @@ def main():
     market_data = MarketData(exchange)
 
     POLL_INTERVAL_SEC = 5 * 60  # 5 minutes
-    CUTOFF_HOUR = 14            # 2:00 PM IST (14:00)
+    START_HOUR = 12             # 12:00 PM IST
+    CUTOFF_HOUR = 13            # 1:00 PM IST
+    CUTOFF_MINUTE = 45          # 1:45 PM IST
 
     while True:
         now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
-        if now_ist.hour >= CUTOFF_HOUR:
-            print(f"\n🕘 Cutoff time reached ({CUTOFF_HOUR}:00 IST). No valid setups found today. Shutting down.")
+        
+        # Monitor start time
+        if now_ist.hour < START_HOUR:
+            print(f"💤 Window not open yet. Waiting {POLL_INTERVAL_SEC // 60}m... (Opens {START_HOUR}:00 IST)")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+            
+        # Hard cutoff time
+        if now_ist.hour > CUTOFF_HOUR or (now_ist.hour == CUTOFF_HOUR and now_ist.minute >= CUTOFF_MINUTE):
+            print(f"\n🕘 Criteria Not Met - Skipping Day. Cutoff time reached ({CUTOFF_HOUR}:{CUTOFF_MINUTE} IST). Shutting down.")
+            sys.exit(0)
+
+        # State Management (Double Entry check)
+        # Fetch open positions directly from Delta Exchange to ensure we don't double enter
+        open_positions = exchange.get_positions()
+        if open_positions:
+            print(f"\n🛑 State Management: Trade already executed/open. Found {len(open_positions)} positions active. Preventing Double-Entry.")
             sys.exit(0)
 
         print(f"\n==================================================")
@@ -95,6 +112,43 @@ def main():
         if is_supertrend_red and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
             print("🛑 ALARM: Red SuperTrend Ban triggered on 15m timeframe! Blocking Bull Put Spread...")
             print("⚠️ Suggesting NO TRADE instead to protect capital.")
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+        
+        # ATR Filter (>20% higher than 3-day average)
+        current_atr = df['atr'].iloc[-1]
+        # 3-day average of hourly ATR = roughly 72 hourly periods
+        avg_atr_3d = df['atr'].tail(72).mean()
+        if current_atr > 1.20 * avg_atr_3d:
+            print(f"🛑 Safe Entry Filter: ATR ({current_atr:.2f}) is > 20% higher than 3-day average ({avg_atr_3d:.2f}). Skipping.")
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+            
+        # Consolidation Filter (High/Low range of last 60 minutes < $400)
+        # 60 mins = 4 x 15-min candles
+        high_60m = df_15m['high'].tail(4).max()
+        low_60m = df_15m['low'].tail(4).min()
+        range_60m = high_60m - low_60m
+        if range_60m >= 400.0:
+            print(f"🛑 Safe Entry Filter: 60m Consolidation range is ${range_60m:.2f} (>= $400). Skipping.")
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+            
+        # Trend Anchor Filter (1h chart trend logic, 4h lookback)
+        close_now = df['close'].iloc[-1]
+        close_4h_ago = df['close'].iloc[-5] if len(df) >= 5 else df['close'].iloc[0]
+        # Calculate the 4h momentum
+        trend_movement_4h = close_now - close_4h_ago
+        if trend_movement_4h <= -250.0 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
+            print(f"🛑 Safe Entry Filter: 1H Trend Anchor is strongly Bearish (dropped ${abs(trend_movement_4h):.2f} in 4H). Blocking Bull Spread.")
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+        if trend_movement_4h >= 250.0 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
+            print(f"🛑 Safe Entry Filter: 1H Trend Anchor is strongly Bullish (rose ${trend_movement_4h:.2f} in 4H). Blocking Bear Spread.")
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
