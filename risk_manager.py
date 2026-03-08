@@ -55,8 +55,7 @@ class RiskManager:
 
     def check_payday(self, unrealized_pnl: float, max_profit: float = 0.0, hours_to_expiry: float = 24.0) -> bool:
         """
-        Adaptive PayDay: If Unrealized Profit > 65% of Max Profit AND Time < 1 hour to expiry, Close All.
-        Fallback to static ₹1,200 gross payday.
+        Adaptive PayDay: If Unrealized Profit > 60% of Max Profit AND Time < 90 mins to expiry, Close All.
         """
         if max_profit > 0 and hours_to_expiry < 1.5:  # Changed to 90m for Gamma edge
             target = max_profit * 0.60  # Changed to 60% Early Harvest
@@ -68,13 +67,6 @@ class RiskManager:
                 self._payday_triggered = True
                 return True
 
-        if unrealized_pnl >= config.PAYDAY_GROSS:
-            logger.info(
-                f"💰 STATIC PAY DAY! Profit: ₹{unrealized_pnl:,.2f} "
-                f"≥ ₹{config.PAYDAY_GROSS:,}. Locking profits!"
-            )
-            self._payday_triggered = True
-            return True
         return False
 
     def check_flash_crash(self, recent_candle: dict) -> bool:
@@ -206,10 +198,10 @@ class RiskManager:
                 "unrealized_pnl": unrealized_pnl,
             }
 
-        # 2. PayDay Exit (Adaptive or Static)
+        # 2. PayDay Exit (Adaptive)
         if self.check_payday(total_pnl, max_profit=max_profit, hours_to_expiry=hours_to_expiry):
             return RiskAction.PAYDAY, {
-                "reason": "Daily profit target reached",
+                "reason": "Early Harvest profit target reached",
                 "total_pnl": total_pnl,
             }
 

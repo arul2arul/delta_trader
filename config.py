@@ -27,7 +27,6 @@ BUFFER_CAPITAL = 80_000     # ₹80,000 buffer (not traded)
 # Profit & Loss Thresholds
 # ──────────────────────────────────────────────
 KILL_SWITCH_LOSS = -8_500   # Force-close all positions at -₹8,500 (approx $100)
-PAYDAY_GROSS = 1_200        # Lock profits at ₹1,200 gross
 STOPLOSS_MULTIPLIER = 2.5   # Per-leg stop: 2.5× premium collected
 TARGET_DAILY_NET = 1_000    # ₹1,000 net daily target
 
