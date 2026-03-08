@@ -13,6 +13,7 @@ import sys
 import logging
 import json
 from datetime import datetime
+import pytz
 
 import config
 from exchange_client import ExchangeClient
@@ -81,6 +82,23 @@ def main():
         # If gap is widening against trend... wait, if trend is against, but our strategy is matching regime.
         # Let's say if gap > X, or just widening.
         print(f"⚠️ Momentum Gap Widening (${curr_gap:.2f}). Proceed with caution.")
+        
+    # 1:30 PM Funding Check
+    now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
+    # If the time is around 1:00 PM - 2:00 PM IST
+    if now_ist.hour == 13:
+        funding_rate = market_data.get_funding_rate()
+        print(f"🕒 1:30 PM Funding Check triggered. Current Funding Rate: {funding_rate * 100:.4f}%")
+        
+        # Funding rate > 0 means Longs pay Shorts. Meaning heavily biased bullish sentiment.
+        # Too high positive rate = dangerous to go long, dangerous for Bull Spreads.
+        # If negative, heavily biased bearish shorting, dangerous for Bear Spreads.
+        if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
+            print("🛑 ALARM: Funding Rate extremely positive. Too much long leverage in the market. Blocking Bull Put Spread...")
+            sys.exit(0)
+        elif funding_rate < -0.0005 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
+            print("🛑 ALARM: Funding Rate extremely negative. Too much short leverage in the market. Blocking Bear Call Spread...")
+            sys.exit(0)
     
     # 6. Build Strategy and get exact order specs (Strikes / Legs)
     print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()}")

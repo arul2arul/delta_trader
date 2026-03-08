@@ -261,3 +261,25 @@ class MarketData:
         iv_rank = max(0, min(100, ((avg_iv - 30) / 90) * 100))
         logger.info(f"IV Rank: {iv_rank:.1f}% (avg IV: {avg_iv:.1f}%)")
         return iv_rank
+
+    def get_funding_rate(self) -> float:
+        """
+        Fetch the current funding rate for the BTC perpetual contract.
+        Useful for checking at 1:30 PM snapshot times.
+        Returns the funding rate as a decimal (e.g., 0.0001 for 0.01%).
+        """
+        try:
+            # We look for the main perpetual ticker
+            ticker = self.client.get_ticker("BTCUSD")
+            if not ticker:
+                # Fallback to USDT perp if BTCUSD isn't active
+                ticker = self.client.get_ticker("BTCUSDT")
+            
+            if ticker and "funding_rate" in ticker:
+                rate = float(ticker.get("funding_rate", 0))
+                logger.info(f"Current BTC Funding Rate: {rate * 100:.4f}%")
+                return rate
+            return 0.0
+        except Exception as e:
+            logger.error(f"Failed to fetch funding rate: {e}")
+            return 0.0
