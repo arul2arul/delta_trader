@@ -1,11 +1,11 @@
 """
-Technical Indicators – RSI, EMA, ADX, VWAP, ATR via pandas_ta.
+Technical Indicators – RSI, EMA, ADX, VWAP, ATR via `ta` library.
 Pure functions that accept DataFrames and return augmented DataFrames.
 """
 
 import logging
 import pandas as pd
-import pandas_ta as ta
+import ta
 
 import config
 
@@ -13,42 +13,31 @@ logger = logging.getLogger("indicators")
 
 
 def compute_rsi(df: pd.DataFrame, period: int = config.RSI_PERIOD) -> pd.DataFrame:
-    """
-    Compute RSI (Relative Strength Index).
-    Adds 'rsi' column to the DataFrame.
-    """
     if df.empty or "close" not in df.columns:
         logger.warning("Cannot compute RSI: empty DataFrame or missing 'close' column")
         return df
 
     df = df.copy()
-    df["rsi"] = ta.rsi(df["close"], length=period)
+    rsi_ind = ta.momentum.RSIIndicator(df["close"], window=period)
+    df["rsi"] = rsi_ind.rsi()
     logger.info(f"RSI({period}) computed. Latest: {df['rsi'].iloc[-1]:.2f}")
     return df
 
 
 def compute_ema(df: pd.DataFrame, period: int = config.EMA_PERIOD) -> pd.DataFrame:
-    """
-    Compute EMA (Exponential Moving Average).
-    Adds 'ema_{period}' column to the DataFrame.
-    """
     if df.empty or "close" not in df.columns:
         logger.warning("Cannot compute EMA: empty DataFrame or missing 'close' column")
         return df
 
     df = df.copy()
     col_name = f"ema_{period}"
-    df[col_name] = ta.ema(df["close"], length=period)
+    ema_ind = ta.trend.EMAIndicator(df["close"], window=period)
+    df[col_name] = ema_ind.ema_indicator()
     logger.info(f"EMA({period}) computed. Latest: {df[col_name].iloc[-1]:.2f}")
     return df
 
 
 def compute_adx(df: pd.DataFrame, period: int = config.ADX_PERIOD) -> pd.DataFrame:
-    """
-    Compute ADX (Average Directional Index).
-    Adds 'adx' column to the DataFrame.
-    Requires 'high', 'low', 'close' columns.
-    """
     if df.empty:
         logger.warning("Cannot compute ADX: empty DataFrame")
         return df
@@ -60,26 +49,18 @@ def compute_adx(df: pd.DataFrame, period: int = config.ADX_PERIOD) -> pd.DataFra
             return df
 
     df = df.copy()
-    adx_df = ta.adx(df["high"], df["low"], df["close"], length=period)
-    if adx_df is not None and not adx_df.empty:
-        adx_col = f"ADX_{period}"
-        if adx_col in adx_df.columns:
-            df["adx"] = adx_df[adx_col]
-            logger.info(f"ADX({period}) computed. Latest: {df['adx'].iloc[-1]:.2f}")
-        else:
-            df["adx"] = adx_df.iloc[:, 0]
-            logger.info(f"ADX({period}) computed (fallback column)")
-    else:
-        logger.warning("ADX computation returned empty result")
+    try:
+        adx_ind = ta.trend.ADXIndicator(df["high"], df["low"], df["close"], window=period)
+        df["adx"] = adx_ind.adx()
+        logger.info(f"ADX({period}) computed. Latest: {df['adx'].iloc[-1]:.2f}")
+    except Exception as e:
+        logger.error(f"ADX computation failed: {e}")
+        df["adx"] = 0.0
 
     return df
 
 
 def compute_atr(df: pd.DataFrame, period: int = getattr(config, "ATR_PERIOD", 14)) -> pd.DataFrame:
-    """
-    Compute ATR (Average True Range).
-    Adds 'atr' column to the DataFrame.
-    """
     if df.empty:
         logger.warning("Cannot compute ATR: empty DataFrame")
         return df
@@ -91,48 +72,41 @@ def compute_atr(df: pd.DataFrame, period: int = getattr(config, "ATR_PERIOD", 14
             return df
 
     df = df.copy()
-    atr_val = ta.atr(df["high"], df["low"], df["close"], length=period)
-    if atr_val is not None and not atr_val.empty:
-        df["atr"] = atr_val
+    try:
+        atr_ind = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=period)
+        df["atr"] = atr_ind.average_true_range()
         logger.info(f"ATR({period}) computed. Latest: {df['atr'].iloc[-1]:.2f}")
-    else:
-        df["atr"] = pd.Series([0.0] * len(df))
-        logger.warning("ATR computation returned empty result")
+    except Exception as e:
+        logger.error(f"ATR computation failed: {e}")
+        df["atr"] = 0.0
 
     return df
 
 
 def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute VWAP (Volume Weighted Average Price).
-    Adds 'vwap' column to the DataFrame.
-    Using pandas_ta vwap requires a datetime index typically, so we set it temporarily if needed.
-    """
     if df.empty:
         logger.warning("Cannot compute VWAP: empty DataFrame")
         return df
 
-    required = ["high", "low", "close", "volume"]
+    required = ["high", "low", "close", "volume", "timestamp"]
     for col in required:
         if col not in df.columns:
             logger.warning(f"Cannot compute VWAP: missing '{col}' column")
             return df
 
     df = df.copy()
-
-    # pandas_ta vwap uses index, let's ensure index is datetime if possible
-    temp_df = df.copy()
-    if "timestamp" in temp_df.columns:
-        temp_df.index = pd.to_datetime(temp_df["timestamp"], unit='s' if temp_df["timestamp"].dtype in ['int64', 'float64'] else None)
-    
     try:
-        vwap_val = ta.vwap(temp_df["high"], temp_df["low"], temp_df["close"], temp_df["volume"])
-        if vwap_val is not None and not vwap_val.empty:
-            df["vwap"] = vwap_val.values
-            logger.info(f"VWAP computed. Latest: {df['vwap'].iloc[-1]:.2f}")
-        else:
-            df["vwap"] = pd.Series([df["close"].iloc[-1]] * len(df))
-            logger.warning("VWAP empty, fallback to close price")
+        # Standard anchored VWAP by day
+        temp_df = df.copy()
+        temp_df['date'] = pd.to_datetime(temp_df["timestamp"], unit='s').dt.date
+        
+        tp = (temp_df['high'] + temp_df['low'] + temp_df['close']) / 3
+        vol = temp_df['volume']
+        
+        temp_df['vwap'] = (tp * vol).groupby(temp_df['date']).cumsum() / vol.groupby(temp_df['date']).cumsum()
+        df["vwap"] = temp_df['vwap'].values
+        
+        logger.info(f"VWAP computed. Latest: {df['vwap'].iloc[-1]:.2f}")
     except Exception as e:
         logger.error(f"VWAP calculation failed: {e}. Fallback to close price.")
         df["vwap"] = df["close"]
@@ -141,10 +115,6 @@ def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:
-    """
-    Compute Supertrend.
-    Adds 'supertrend_dir' (1 for Bull, -1 for Bear) to the DataFrame.
-    """
     if df.empty:
         return df
 
@@ -155,40 +125,46 @@ def compute_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3
 
     df = df.copy()
     try:
-        st_df = ta.supertrend(df["high"], df["low"], df["close"], length=period, multiplier=multiplier)
-        if st_df is not None and not st_df.empty:
-            st_col = f"SUPERTd_{period}_{multiplier}"
-            if st_col in st_df.columns:
-                df["supertrend_dir"] = st_df[st_col]
+        atr_ind = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=period)
+        atr = atr_ind.average_true_range()
+        
+        hl2 = (df["high"] + df["low"]) / 2
+        
+        upperband = hl2 + (multiplier * atr)
+        lowerband = hl2 - (multiplier * atr)
+        
+        supertrend_dir = [1] * len(df)
+        
+        for i in range(1, len(df)):
+            if df["close"].iloc[i-1] <= upperband.iloc[i-1]:
+                upperband.iloc[i] = min(upperband.iloc[i], upperband.iloc[i-1])
+            if df["close"].iloc[i-1] >= lowerband.iloc[i-1]:
+                lowerband.iloc[i] = max(lowerband.iloc[i], lowerband.iloc[i-1])
+                
+            if df["close"].iloc[i] > upperband.iloc[i-1]:
+                supertrend_dir[i] = 1
+            elif df["close"].iloc[i] < lowerband.iloc[i-1]:
+                supertrend_dir[i] = -1
             else:
-                df["supertrend_dir"] = st_df.iloc[:, 1]
-            logger.info("Supertrend computed.")
-        else:
-            df["supertrend_dir"] = 1  # Default Bullish fallback
+                supertrend_dir[i] = supertrend_dir[i-1]
+                
+        df["supertrend_dir"] = pd.Series(supertrend_dir, index=df.index)
+        logger.info("Supertrend computed natively.")
     except Exception as e:
         logger.error(f"Supertrend calculation failed: {e}")
         df["supertrend_dir"] = 1
+        
     return df
 
 
 def compute_all(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute all primary indicators in one pass.
-    """
     df = compute_rsi(df)
-    df = compute_ema(df, period=9)  # For Momentum Gap Filter
-    df = compute_ema(df)            # Generic EMA
+    df = compute_ema(df, period=9)
+    df = compute_ema(df)
     df = compute_adx(df)
     df = compute_atr(df)
     df = compute_vwap(df)
+    df = compute_supertrend(df)
     
-    logger.info(
-        f"All indicators computed. "
-        f"RSI={df['rsi'].iloc[-1]:.1f}, "
-        f"EMA={df.get(f'ema_{config.EMA_PERIOD}', pd.Series([0])).iloc[-1]:.1f}, "
-        f"ADX={df.get('adx', pd.Series([0])).iloc[-1]:.1f}, "
-        f"ATR={df.get('atr', pd.Series([0])).iloc[-1]:.1f}, "
-        f"VWAP={df.get('vwap', pd.Series([0])).iloc[-1]:.1f}"
-    )
+    logger.info("All indicators computed successfully.")
     return df
-
