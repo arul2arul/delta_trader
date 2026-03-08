@@ -188,13 +188,14 @@ def main():
                 continue
         
         # 6. Build Strategy and get exact order specs (Strikes / Legs)
-        print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()}")
+        print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()} (10 Lots)")
         try:
             strategy_type, order_specs = build_strategy(
                 regime=regime,
                 chain=chain,
                 spot_price=spot_price,
                 wide_wings=wide_wings,
+                lot_size=10  # Hardcoded specifically for testing week
             )
         except Exception as e:
             print(f"❌ Error building strategy: {e}")
