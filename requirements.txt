@@ -1,7 +1,7 @@
 delta-rest-client>=1.0.0
 ccxt>=4.0.0
 pandas>=2.0.0
-pandas_ta>=0.3.14b
+pandas_ta==0.3.14b
 schedule>=1.2.0
 python-dotenv>=1.0.0
 requests>=2.31.0
