@@ -23,8 +23,17 @@ from indicators import compute_all
 from regime_detector import detect_regime, check_volatility, get_strategy_for_regime
 from strategy_engine import build_strategy
 
-logging.basicConfig(level=logging.WARNING, format='%(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.WARNING, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("brain_execution.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger("analyze_0dte")
+# We want to explicitly log our decision-making heavily to the file
+logger.setLevel(logging.INFO)
 
 def main():
     print("🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...\n")
@@ -245,13 +254,35 @@ def main():
             })
 
         print("\n--- OPENCLAW JSON PAYLOAD ---")
-        print(json.dumps({
+        payload_str = json.dumps({
             "strategy": strategy_type.value,
             "underlying": spot_price,
             "net_credit": net_credit,
             "orders": api_payload
-        }, indent=2))
+        }, indent=2)
+        print(payload_str)
         print("-----------------------------")
+        
+        logger.info(f"Generated Payload: {payload_str}")
+        
+        # Save Trade Decision Context for Post-Trade Logger to evaluate EOD
+        trade_context = {
+            "date": now_ist.strftime('%Y-%m-%d'),
+            "entry_time": now_ist.strftime('%H:%M:%S'),
+            "spot_price": spot_price,
+            "regime": regime.value,
+            "atr_at_entry": current_atr,
+            "atr_3d_avg": avg_atr_3d,
+            "trend_4h_movement": trend_movement_4h,
+            "consolidation_range_60m": range_60m,
+            "suggested_strategy": strategy_type.value,
+            "net_credit_expected": net_credit,
+            "recommended_orders": api_payload
+        }
+        with open("daily_trade_context.json", "w") as f:
+            json.dump(trade_context, f, indent=4)
+        logger.info("Saved 'daily_trade_context.json' for EOD verification.")
+        
         
         # Exit successfully to OpenClaw execution after rendering a valid payload
         sys.exit(0)
