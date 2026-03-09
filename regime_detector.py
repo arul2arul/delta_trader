@@ -126,7 +126,11 @@ def get_strategy_for_regime(regime: Regime) -> config.StrategyType:
         else:
             strategy = config.StrategyType.BULL_CREDIT_SPREAD
     elif regime == Regime.BEARISH:
-        strategy = config.StrategyType.BEAR_CREDIT_SPREAD
+        if fear_val <= 25:
+            logger.warning("⚠️ Extreme Fear detected. Downside volatility is too erratic for Bear Call Spreads. Downgrading to Iron Condor.")
+            strategy = config.StrategyType.IRON_CONDOR
+        else:
+            strategy = config.StrategyType.BEAR_CREDIT_SPREAD
 
     logger.info(f"Strategy selected for {regime.value} with Fear Factor {fear_val}: {strategy.value}")
     return strategy
