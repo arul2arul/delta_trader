@@ -38,6 +38,7 @@ When interacting with the `analyze_0dte.py` Python script, OpenClaw must treat t
     - **Est. Max Profit:** (Calculated from the `net_credit` / net premiums collected)
     - **Est. Max Loss:** (Calculated by finding the width of the spread wings minus the net credit received)
     - **Breakeven Point(s):** (Calculated based on Short Strike + or - the Net Credit)
+    - **AI Risk Assessment:** (If provided in the JSON payload under `ai_assessment`, display the AI's confidence score and rationale to the user so they can review the quantitative + qualitative reasoning before approving).
 
    *Only after presenting these explicit, calculated risk parameters clearly on Telegram may you ask the user for "Yes/No" final execution approval.*
 

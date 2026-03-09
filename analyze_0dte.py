@@ -22,6 +22,7 @@ from market_data import MarketData
 from indicators import compute_all
 from regime_detector import detect_regime, check_volatility, get_strategy_for_regime
 from strategy_engine import build_strategy
+from ai_validator import ask_ai_for_second_opinion
 
 logging.basicConfig(
     level=logging.WARNING, 
@@ -260,19 +261,7 @@ def main():
                 
             api_payload.append(leg_dict)
 
-        print("\n--- OPENCLAW JSON PAYLOAD ---")
-        payload_str = json.dumps({
-            "strategy": strategy_type.value,
-            "underlying": spot_price,
-            "net_credit": net_credit,
-            "orders": api_payload
-        }, indent=2)
-        print(payload_str)
-        print("-----------------------------")
-        
-        logger.info(f"Generated Payload: {payload_str}")
-        
-        # Save Trade Decision Context for Post-Trade Logger to evaluate EOD
+        # Prepare Trade Decision Context
         trade_context = {
             "date": now_ist.strftime('%Y-%m-%d'),
             "entry_time": now_ist.strftime('%H:%M:%S'),
@@ -284,8 +273,45 @@ def main():
             "consolidation_range_60m": range_60m,
             "suggested_strategy": strategy_type.value,
             "net_credit_expected": net_credit,
+            "funding_rate": funding_rate if now_ist.hour == 13 else 0, # Pass from above if available
             "recommended_orders": api_payload
         }
+
+        # --- AI Second Opinion Check ---
+        ai_rationale = ""
+        if getattr(config, "USE_AI_VALIDATION", False):
+            print("\n🤖 Consulting AI Model (Gemini) for Second Opinion...")
+            ai_result = ask_ai_for_second_opinion(trade_context)
+            confidence = ai_result.get("confidence_score", 10)
+            ai_rationale = ai_result.get("rationale", "")
+            
+            print(f"🧠 AI Assessment:\n{ai_rationale}")
+            
+            if confidence <= 5:
+                print(f"\n🛑 ALARM: AI Validation Failed (Confidence {confidence}/10). The mathematical setup looks poor to the AI. Trade rejected.")
+                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                time.sleep(POLL_INTERVAL_SEC)
+                continue
+            else:
+                print(f"✅ AI Validation Passed (Confidence {confidence}/10). Proceeding to execution payload.")
+
+        print("\n--- OPENCLAW JSON PAYLOAD ---")
+        payload_dict = {
+            "strategy": strategy_type.value,
+            "underlying": spot_price,
+            "net_credit": net_credit,
+            "orders": api_payload
+        }
+        if ai_rationale:
+            payload_dict["ai_assessment"] = ai_rationale
+            
+        payload_str = json.dumps(payload_dict, indent=2)
+        print(payload_str)
+        print("-----------------------------")
+        
+        logger.info(f"Generated Payload: {payload_str}")
+        
+        # Save Trade Decision Context for Post-Trade Logger to evaluate EOD
         with open("daily_trade_context.json", "w") as f:
             json.dump(trade_context, f, indent=4)
         logger.info("Saved 'daily_trade_context.json' for EOD verification.")
