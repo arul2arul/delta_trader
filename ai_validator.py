@@ -29,8 +29,8 @@ def ask_ai_for_second_opinion(trade_context: dict) -> dict:
 
     try:
         genai.configure(api_key=api_key)
-        # Using gemini-1.5-flash for fastest, cheapest execution
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # Using gemini-2.5-flash for the latest advanced reasoning and speed
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         regime = trade_context.get("regime", "UNKNOWN")
         spot_price = trade_context.get("spot_price", 0)
