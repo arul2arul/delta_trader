@@ -1,0 +1,28 @@
+{
+    "date": "2026-03-08",
+    "entry_time": "21:00:24",
+    "spot_price": 67106.53766205,
+    "regime": "bearish",
+    "atr_at_entry": 424.7684940550118,
+    "atr_3d_avg": 532.4087987928802,
+    "trend_4h_movement": -317.5,
+    "consolidation_range_60m": 330.0,
+    "suggested_strategy": "bear_credit_spread",
+    "net_credit_expected": 103.36697895,
+    "recommended_orders": [
+        {
+            "product_id": 125578,
+            "side": "sell",
+            "size": 1,
+            "order_type": "limit_order",
+            "limit_price": 141.2930184
+        },
+        {
+            "product_id": 125571,
+            "side": "buy",
+            "size": 1,
+            "order_type": "limit_order",
+            "limit_price": 37.92603945
+        }
+    ]
+}
