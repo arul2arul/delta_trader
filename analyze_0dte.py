@@ -36,6 +36,22 @@ logger = logging.getLogger("analyze_0dte")
 # We want to explicitly log our decision-making heavily to the file
 logger.setLevel(logging.INFO)
 
+def log_rejection(reason: str, spot_price: float = 0.0, regime_str: str = "UNKNOWN"):
+    """Saves a simple summary of why the bot chose not to trade this cycle."""
+    now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
+    summary = {
+        "timestamp": now_ist.strftime('%Y-%m-%d %H:%M:%S'),
+        "spot_price": round(spot_price, 2) if spot_price else 0.0,
+        "regime": regime_str,
+        "reason": reason,
+        "status": "NO_TRADE"
+    }
+    with open("rejection_log.jsonl", "a") as f:
+        f.write(json.dumps(summary) + "\n")
+    with open("latest_status.json", "w") as f:
+        json.dump(summary, f, indent=4)
+
+
 def main():
     print("🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...\n")
     exchange = ExchangeClient()
@@ -48,6 +64,8 @@ def main():
 
     while True:
         now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
+        current_spot = 0.0
+        current_regime = "UNKNOWN"
         
         # Monitor start time
         if now_ist.hour < START_HOUR:
@@ -57,7 +75,9 @@ def main():
             
         # Hard cutoff time
         if now_ist.hour > CUTOFF_HOUR or (now_ist.hour == CUTOFF_HOUR and now_ist.minute >= CUTOFF_MINUTE):
-            print(f"\n🕘 Criteria Not Met - Skipping Day. Cutoff time reached ({CUTOFF_HOUR}:{CUTOFF_MINUTE} IST). Shutting down.")
+            reason = f"Cutoff time reached ({CUTOFF_HOUR}:{CUTOFF_MINUTE} IST). Skipping Day."
+            print(f"\n🕘 Criteria Not Met - {reason} Shutting down.")
+            log_rejection(reason, current_spot, current_regime)
             sys.exit(0)
 
         # State Management (Double Entry check)
@@ -73,6 +93,7 @@ def main():
 
         # 1. Fetch Spot
         spot_price = market_data.get_spot_price()
+        current_spot = spot_price
         print(f"💰 Spot Price: ${spot_price:,.2f}")
 
         # 2. Fetch Candles & Indicators (1h for regime, 15m for strict entry rules)
@@ -80,7 +101,9 @@ def main():
         df_15m = market_data.get_candles(resolution="15m")
         
         if df.empty or df_15m.empty:
-            print("❌ Error: No candle data available.")
+            reason = "No candle data available."
+            print(f"❌ Error: {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -90,6 +113,7 @@ def main():
         
         # 3. Detect Regime
         regime = detect_regime(df)
+        current_regime = regime.value
         latest = df.iloc[-1]
         print(f"📊 Market Regimen: {regime.value.upper()}")
         print(f"   RSI: {latest['rsi']:.1f} | ADX: {latest['adx']:.1f} | ATR: {latest['atr']:.1f} | VWAP: {latest['vwap']:.1f}")
@@ -100,7 +124,9 @@ def main():
         # 5. Fetch Option Chain and Check Volatility
         chain = market_data.get_option_chain()
         if not chain:
-            print("❌ Error: No option chain available for 0 DTE contracts.")
+            reason = "No option chain available for 0 DTE contracts."
+            print(f"❌ Error: {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -120,8 +146,10 @@ def main():
         widening_gap = curr_gap > prev_gap
         
         if is_supertrend_red and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
-            print("🛑 ALARM: Red SuperTrend Ban triggered on 15m timeframe! Blocking Bull Put Spread...")
+            reason = "Red SuperTrend Ban triggered on 15m timeframe! Blocking Bull Put Spread."
+            print(f"🛑 ALARM: {reason}")
             print("⚠️ Suggesting NO TRADE instead to protect capital.")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -131,7 +159,9 @@ def main():
         # 3-day average of hourly ATR = roughly 72 hourly periods
         avg_atr_3d = df['atr'].tail(72).mean()
         if current_atr > 1.20 * avg_atr_3d:
-            print(f"🛑 Safe Entry Filter: ATR ({current_atr:.2f}) is > 20% higher than 3-day average ({avg_atr_3d:.2f}). Skipping.")
+            reason = f"ATR ({current_atr:.2f}) is > 20% higher than 3-day average ({avg_atr_3d:.2f})."
+            print(f"🛑 Safe Entry Filter: {reason} Skipping.")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -142,7 +172,9 @@ def main():
         low_60m = df_15m['low'].tail(4).min()
         range_60m = high_60m - low_60m
         if range_60m >= 400.0:
-            print(f"🛑 Safe Entry Filter: 60m Consolidation range is ${range_60m:.2f} (>= $400). Skipping.")
+            reason = f"60m Consolidation range is ${range_60m:.2f} (>= $400)."
+            print(f"🛑 Safe Entry Filter: {reason} Skipping.")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -153,12 +185,16 @@ def main():
         # Calculate the 4h momentum
         trend_movement_4h = close_now - close_4h_ago
         if trend_movement_4h <= -250.0 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
-            print(f"🛑 Safe Entry Filter: 1H Trend Anchor is strongly Bearish (dropped ${abs(trend_movement_4h):.2f} in 4H). Blocking Bull Spread.")
+            reason = f"1H Trend Anchor is strongly Bearish (dropped ${abs(trend_movement_4h):.2f} in 4H). Blocking Bull Spread."
+            print(f"🛑 Safe Entry Filter: {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
         if trend_movement_4h >= 250.0 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
-            print(f"🛑 Safe Entry Filter: 1H Trend Anchor is strongly Bullish (rose ${trend_movement_4h:.2f} in 4H). Blocking Bear Spread.")
+            reason = f"1H Trend Anchor is strongly Bullish (rose ${trend_movement_4h:.2f} in 4H). Blocking Bear Spread."
+            print(f"🛑 Safe Entry Filter: {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -178,12 +214,16 @@ def main():
             # Too high positive rate = dangerous to go long, dangerous for Bull Spreads.
             # If negative, heavily biased bearish shorting, dangerous for Bear Spreads.
             if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
-                print("🛑 ALARM: Funding Rate extremely positive. Too much long leverage in the market. Blocking Bull Put Spread...")
+                reason = "Funding Rate extremely positive. Too much long leverage in the market. Blocking Bull Put Spread."
+                print(f"🛑 ALARM: {reason}")
+                log_rejection(reason, current_spot, current_regime)
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
             elif funding_rate < -0.0005 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
-                print("🛑 ALARM: Funding Rate extremely negative. Too much short leverage in the market. Blocking Bear Call Spread...")
+                reason = "Funding Rate extremely negative. Too much short leverage in the market. Blocking Bear Call Spread."
+                print(f"🛑 ALARM: {reason}")
+                log_rejection(reason, current_spot, current_regime)
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
@@ -199,13 +239,17 @@ def main():
                 lot_size=config.BASE_LOT_SIZE
             )
         except Exception as e:
-            print(f"❌ Error building strategy: {e}")
+            reason = f"Error building strategy: {e}"
+            print(f"❌ {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
 
         if not order_specs:
-            print("⚠️ No valid strikes found passing Greek & Slippage Guard criteria.")
+            reason = "No valid strikes found passing Greek & Slippage Guard criteria."
+            print(f"⚠️ {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -239,7 +283,9 @@ def main():
         # 7. Fee-Aware Exit Check
         # Average Delta contract fee + slippage buffer ≈ $15 (assuming normal lot sizes)
         if net_credit < 15.0:
-            print(f"🛑 ALARM: Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < $15. Trade rejected to avoid 'working for the exchange'.")
+            reason = f"Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < $15. Trade rejected to avoid 'working for the exchange'."
+            print(f"🛑 ALARM: {reason}")
+            log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
             time.sleep(POLL_INTERVAL_SEC)
             continue
@@ -288,7 +334,9 @@ def main():
             print(f"🧠 AI Assessment:\n{ai_rationale}")
             
             if confidence <= 5:
-                print(f"\n🛑 ALARM: AI Validation Failed (Confidence {confidence}/10). The mathematical setup looks poor to the AI. Trade rejected.")
+                reason = f"AI Validation Failed (Confidence {confidence}/10). The mathematical setup looks poor to the AI."
+                print(f"\n🛑 ALARM: {reason} Trade rejected.")
+                log_rejection(reason, current_spot, current_regime)
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
