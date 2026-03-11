@@ -2,10 +2,10 @@
 
 This repository contains a highly conservative, quantitative 0-DTE (Zero Days to Expiration) crypto options trading bot designed specifically for the **Delta Exchange API**.
 
-The architecture is split into two perfectly isolated components:
+The architecture is entirely self-contained within Python:
 
-1. **The Pure-Math Python Brain:** Analyzes real-time market data, checks heavy mathematical constraints, and outputs a valid JSON trade payload.
-2. **The OpenClaw AI Wrapper:** Acts as a deterministic robotic "Secretary" that executes the payload and handles human-in-the-loop Telegram approvals.
+1. **The Math Engine:** Analyzes real-time market data, checks heavy mathematical constraints, and selects the exact strikes.
+2. **The Execution & Notification Engine:** Natively routes API calls to Delta Exchange in milliseconds securely, and uses the Telegram API to send execution receipts directly to your phone.
 
 ---
 
@@ -21,7 +21,7 @@ The core logic resides in `analyze_0dte.py`. This script runs as a continuous po
 4. **Regime Detection:** It looks at RSI & ADX to label the market as `SIDEWAYS`, `BULLISH`, or `BEARISH`.
 5. **Strict Pre-Entry Checks:** It passes the market data through heavily constrained safety checks. If *any* check fails, it safely goes to sleep for 5 minutes and tries again.
 6. **AI Second Opinion:** If all mathematical checks pass, it packages the market context and asks the `gemini-2.5-flash` LLM for a qualitative safety check.
-7. **JSON Payload Generation:** It mathematically builds the Option strikes (e.g., Short Call, Long Call), applies the lot size, Calculates Stop Loss & Take Profit limits, and prints a final JSON payload to standard output for OpenClaw to catch.
+7. **Native Execution & Alerting:** It uses `order_manager.py` to seamlessly submit the Limit/Market orders + instant bracket Stop-Losses, and then fires a Telegram notification receipt to your phone instantly.
 
 ### The Quantitative Pre-Entry Criteria (Safety Checks)
 
@@ -47,19 +47,20 @@ Right before issuing a real trade payload, the Python code calls the `gemini-2.5
 * **The Kill Switch:** If Gemini gives the mathematical setup a score of `<= 5` (e.g., it senses a flash crash or bizarre contradiction the math missed), the Python script literally aborts its own trade.
 * If the score is valid, it appends the written rationale into the JSON payload.
 
----
+## 3. Autonomous Execution & Telegram Notification
 
-## 3. OpenClaw's Responsibilities (The Executor)
+The system is designed to run 100% autonomously without any "human-in-the-loop" approval needed, bypassing LLM agents entirely.
 
-OpenClaw has **no authority** to pick strikes, decide the strategy, or determine the logic. OpenClaw is strictly a "Sentinel" execution assistant.
+### Execution Safety
 
-OpenClaw's exact responsibilities are:
+When `analyze_0dte.py` finds a trade:
 
-1. **Macro-Scheduling:** Trigger `analyze_0dte.py` once per day.
-2. **Listen Silently:** Ignore all the noisy terminal polling output the Brain produces.
-3. **Parse & Present:** When the Brain outputs the final `--- OPENCLAW JSON PAYLOAD ---`, OpenClaw must parse it. It calculates the Estimated Max Profit, Max Loss, and Breakeven Point, grabs the AI Risk Assessment paragraph, and sends a highly formatted message to the user on Telegram.
-4. **Human-in-the-Loop Execution:** OpenClaw waits for the user to reply "Yes".
-5. **A-Symmetric Order Routing:** Upon approval, OpenClaw routes to the Delta Exchange API:
-   * Primary `limit_order` for Short (Sell) legs to extract exact premium.
-   * Primary `market_order` for Long (Buy) protection wings to guarantee fill.
-6. **Autonomous Exchange Exits:** **CRITICAL** - Immediately after verifying the short legs are securely filled, OpenClaw natively triggers the hard Bracket Orders (Stop Market & Limit Take Profit) provided in the JSON directly onto the Delta Exchange servers so the bot is mathematically protected from blowouts even if the VM shuts down or the internet drops.
+1. It instantly fetches your wallet balance via `exchange_client.py` and calculates margin requirements safely.
+2. It natively batch-submits the exact Limit/Market orders to Delta without resting failures.
+3. **CRITICAL:** Instantly after submitting the trade, it uses `order_manager.py` to place **Hard Stop Loss** and **Take Profit** bracket orders natively on Delta Exchange servers, guaranteeing you are never left with naked options overnight even if your laptop/VM loses internet.
+
+### Telegram Receipts
+
+Instead of relying on third-party services, `notifier.py` connects directly to the Telegram API. Every time the bot successfully places an Iron Condor or Credit Spread, it will ping your phone with a receipt detailing the Exact Strategy, Net Credit collected, Spot Price at entry, and the AI's Rationale.
+
+You do not need to click "Yes" – the bot is fully self-sufficient.

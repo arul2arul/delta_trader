@@ -25,6 +25,7 @@ from strategy_engine import build_strategy
 from ai_validator import ask_ai_for_second_opinion
 from trade_logger import TradeLogger
 from order_manager import OrderManager
+from notifier import Notifier
 
 logging.basicConfig(
     level=logging.WARNING, 
@@ -370,10 +371,29 @@ def main():
             order_manager.place_protective_orders(order_specs, net_credit)
             
             print("\n✅ Execution Fully Successful!")
+            
+            # Send Notification natively
+            notifier = Notifier()
+            msg = (
+                f"✅ *TRADE SUCCESSFULLY EXECUTED*\n\n"
+                f"📈 *Strategy*: {strategy_type.value.upper()}\n"
+                f"💰 *Spot Price*: ${spot_price:,.2f}\n"
+                f"💵 *Net Credit*: ${net_credit:.4f}\n\n"
+                f"🛡️ Hard Stop-Loss & Take-Profit brackets have been securely placed natively on Delta Exchange servers."
+            )
+            # Add AI Rationale if exists
+            if ai_rationale:
+                msg += f"\n\n🤖 *AI Rationale*:\n{ai_rationale}"
+                
+            notifier.send_alert(msg)
+            
         except Exception as e:
             reason = f"FATAL ERROR during native Order Routing: {e}"
             print(f"🛑 ALARM: {reason}")
             log_rejection(reason, current_spot, current_regime)
+            
+            # Alert user of fatal crash
+            Notifier().send_error_alert(reason)
             sys.exit(0)
 
         print("\n--- OPENCLAW JSON PAYLOAD (SUCCESSFULLY EXECUTED) ---")
