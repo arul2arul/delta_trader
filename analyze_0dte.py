@@ -5,8 +5,8 @@ analyze_0dte.py
 The main OpenClaw "Brain" script.
 Fetches market data, computes indicators (RSI, EMA, ADX, VWAP, ATR),
 detects regime (Fear/Greed included), and builds option spread/condor recommendations.
-Outputs a clean text summary for OpenClaw to read and act upon.
-NO direct executions happen here.
+Outputs a clean text summary for OpenClaw to read and relay heavily to Telegram.
+This script natively handles its own API Execution and bracket SL/TP placement to prevent LLM errors.
 """
 
 import sys
@@ -23,6 +23,8 @@ from indicators import compute_all
 from regime_detector import detect_regime, check_volatility, get_strategy_for_regime
 from strategy_engine import build_strategy
 from ai_validator import ask_ai_for_second_opinion
+from trade_logger import TradeLogger
+from order_manager import OrderManager
 
 logging.basicConfig(
     level=logging.WARNING, 
@@ -343,19 +345,51 @@ def main():
             else:
                 print(f"✅ AI Validation Passed (Confidence {confidence}/10). Proceeding to execution payload.")
 
-        print("\n--- OPENCLAW JSON PAYLOAD ---")
+        # ==========================================================
+        # 🔥 NATIVE EXECUTION BLOCK (Replaces LLM Middleman)
+        # ==========================================================
+        print("\n💥 INITIALIZING LIVE EXECUTION 💥")
+        trade_logger = TradeLogger()
+        order_manager = OrderManager(exchange, trade_logger)
+        
+        # Fetch true margin to ensure safety
+        wallet_balance = exchange.get_wallet_balance()
+        if not order_manager.validate_margin(order_specs, wallet_balance):
+            reason = "Margin Validation Failed. Not enough capital to safely place Iron Condor / Spread."
+            print(f"🛑 ALARM: {reason} Trade rejected.")
+            log_rejection(reason, current_spot, current_regime)
+            sys.exit(0)
+            
+        try:
+            # 1. Fire limit & market orders for the wings natively
+            print("🚀 Routing Multi-Leg Order to Delta Exchange...")
+            order_manager.place_batch_orders(order_specs)
+            
+            # 2. Fire immediate Hard Stop-Loss and Take-Profit bounds
+            print("🛡️ Placing Exchange-Side Stop Loss & Take Profit Guards...")
+            order_manager.place_protective_orders(order_specs, net_credit)
+            
+            print("\n✅ Execution Fully Successful!")
+        except Exception as e:
+            reason = f"FATAL ERROR during native Order Routing: {e}"
+            print(f"🛑 ALARM: {reason}")
+            log_rejection(reason, current_spot, current_regime)
+            sys.exit(0)
+
+        print("\n--- OPENCLAW JSON PAYLOAD (SUCCESSFULLY EXECUTED) ---")
         payload_dict = {
             "strategy": strategy_type.value,
             "underlying": spot_price,
             "net_credit": net_credit,
-            "orders": api_payload
+            "orders": api_payload,
+            "execution_status": "SUCCESS - POSITIONS OPENED"
         }
         if ai_rationale:
             payload_dict["ai_assessment"] = ai_rationale
             
         payload_str = json.dumps(payload_dict, indent=2)
         print(payload_str)
-        print("-----------------------------")
+        print("-----------------------------------------------------")
         
         logger.info(f"Generated Payload: {payload_str}")
         
