@@ -1,28 +1,47 @@
 {
-    "date": "2026-03-08",
-    "entry_time": "21:00:24",
-    "spot_price": 67106.53766205,
-    "regime": "bearish",
-    "atr_at_entry": 424.7684940550118,
-    "atr_3d_avg": 532.4087987928802,
-    "trend_4h_movement": -317.5,
-    "consolidation_range_60m": 330.0,
-    "suggested_strategy": "bear_credit_spread",
-    "net_credit_expected": 103.36697895,
+    "date": "2026-03-11",
+    "entry_time": "12:51:22",
+    "spot_price": 69786.15309156,
+    "regime": "sideways",
+    "atr_at_entry": 615.7070653640806,
+    "atr_3d_avg": 618.0281429634771,
+    "trend_4h_movement": 281.5,
+    "consolidation_range_60m": 315.0,
+    "suggested_strategy": "iron_condor",
+    "net_credit_expected": 15.083306119999998,
+    "funding_rate": 0,
     "recommended_orders": [
         {
-            "product_id": 125578,
+            "product_id": 126128,
             "side": "sell",
-            "size": 1,
+            "size": 10,
             "order_type": "limit_order",
-            "limit_price": 141.2930184
+            "limit_price": 12.55924566,
+            "stop_loss_price": 31.4,
+            "take_profit_price": 1.26
         },
         {
-            "product_id": 125571,
-            "side": "buy",
-            "size": 1,
+            "product_id": 125975,
+            "side": "sell",
+            "size": 10,
             "order_type": "limit_order",
-            "limit_price": 37.92603945
+            "limit_price": 10.76825251,
+            "stop_loss_price": 26.92,
+            "take_profit_price": 1.08
+        },
+        {
+            "product_id": 126154,
+            "side": "buy",
+            "size": 10,
+            "order_type": "market_order",
+            "limit_price": 2.95814592
+        },
+        {
+            "product_id": 125845,
+            "side": "buy",
+            "size": 10,
+            "order_type": "market_order",
+            "limit_price": 5.28604613
         }
     ]
 }

@@ -37,8 +37,12 @@ def fetch_daily_pnl_and_fees(exchange: ExchangeClient):
 
     try:
         # Fetch directly via REST pass-through
-        resp = exchange.client.request("GET", "/v2/fills", payload, auth=True)
-        fills = resp.get("result", []) if isinstance(resp, dict) else []
+        resp = exchange.client.request("GET", "/v2/fills", query=payload, auth=True)
+        if hasattr(resp, "json"):
+            data = resp.json()
+            fills = data.get("result", []) if isinstance(data, dict) else []
+        else:
+            fills = resp.get("result", []) if isinstance(resp, dict) else []
         
         realized_pnl = sum(float(f.get("realized_pnl", 0)) for f in fills)
         total_fees = sum(float(f.get("fee", 0)) for f in fills)

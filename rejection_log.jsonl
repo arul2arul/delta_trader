@@ -1,0 +1,6 @@
+{"timestamp": "2026-03-11 12:14:27", "spot_price": 69792.24, "regime": "sideways", "reason": "60m Consolidation range is $458.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-11 12:19:28", "spot_price": 69684.54, "regime": "sideways", "reason": "60m Consolidation range is $450.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-11 12:22:49", "spot_price": 69897.84, "regime": "sideways", "reason": "60m Consolidation range is $515.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-11 12:24:30", "spot_price": 69924.02, "regime": "bearish", "reason": "60m Consolidation range is $515.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-11 12:24:46", "spot_price": 69923.31, "regime": "bearish", "reason": "60m Consolidation range is $515.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-11 12:29:51", "spot_price": 69919.66, "regime": "bearish", "reason": "60m Consolidation range is $515.00 (>= $400).", "status": "NO_TRADE"}
