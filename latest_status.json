@@ -1,7 +1,7 @@
 {
-    "timestamp": "2026-03-11 12:29:51",
-    "spot_price": 69919.66,
+    "timestamp": "2026-03-12 12:58:28",
+    "spot_price": 69563.4,
     "regime": "bearish",
-    "reason": "60m Consolidation range is $515.00 (>= $400).",
+    "reason": "Fee-Aware Exit Triggered. Net Credit $4.99 is < $15. Trade rejected to avoid 'working for the exchange'.",
     "status": "NO_TRADE"
 }

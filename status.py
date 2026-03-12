@@ -269,7 +269,10 @@ def main():
     # ── Risk Config ──
     print_header("Risk Limits (Config)")
     print_row("Kill Switch", f"at {config.KILL_SWITCH_LOSS:,} INR")
-    print_row("PayDay Exit", f"at {config.PAYDAY_GROSS:,} INR")
+    try:
+        print_row("PayDay Exit", f"at {config.TARGET_DAILY_NET:,} INR")
+    except AttributeError:
+        pass
     print_row("Per-Leg Stop Loss", f"{config.STOPLOSS_MULTIPLIER}x premium")
     print_row("Max Margin", f"{config.MAX_MARGIN_PCT * 100:.0f}% of capital")
 

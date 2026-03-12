@@ -15,6 +15,11 @@ import json
 from datetime import datetime
 import time
 import pytz
+import io
+
+# Force UTF-8 output to handle emojis on Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 import config
 from exchange_client import ExchangeClient

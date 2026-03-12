@@ -50,7 +50,7 @@ def main():
     spot = md.get_spot_price()
     print(f"   BTC Spot Price: ${spot:,.2f}")
 
-    df = md.get_hourly_candles()
+    df = md.get_candles(resolution="1h")
     if df.empty:
         logger.error("❌ No candle data available.")
         return

@@ -133,14 +133,18 @@ class MarketData:
                     expiry_groups[exp] = []
                 expiry_groups[exp].append(p)
 
-            # Pick the expiry group with the most contracts (most liquid)
-            best_group = max(expiry_groups.values(), key=len)
+            # Pick the expiry group that expires soonest (true 0-DTE)
+            # Sort the expiry times (they are strings like '2026-03-12T12:00:00Z', so string sort works)
+            sorted_expiries = sorted(expiry_groups.keys())
+            best_expiry = sorted_expiries[0]
+            best_group = expiry_groups[best_expiry]
+            
             logger.info(
-                f"Found BTC daily expiry with {len(best_group)} contracts"
+                f"Found BTC daily expiry ({best_expiry}) with {len(best_group)} contracts"
             )
             return {
                 "contracts": best_group,
-                "expiry": best_group[0].get("settlement_time"),
+                "expiry": best_expiry,
                 "underlying_symbol": config.UNDERLYING_SYMBOL,
             }
 

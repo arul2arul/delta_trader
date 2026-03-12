@@ -241,12 +241,14 @@ class ExchangeClient:
         def _place():
             if stop_price > 0:
                 # Use SDK's place_stop_order for stop orders
+                # If no limit_price provided for a stop, set it equal to stop_price to act as a Stop-Limit
+                final_limit = limit_price if limit_price > 0 else stop_price
                 return self._delta_client.place_stop_order(
                     product_id=product_id,
                     size=size,
                     side=side,
                     stop_price=str(stop_price),
-                    limit_price=str(limit_price) if limit_price > 0 else None,
+                    limit_price=str(final_limit),
                 )
             elif order_type == "limit_order" and limit_price > 0:
                 return self._delta_client.place_order(
@@ -318,7 +320,12 @@ class ExchangeClient:
             resp = self._delta_client.request(
                 "GET", "/v2/positions/margined", auth=True
             )
-            if isinstance(resp, dict):
+            if hasattr(resp, "json"):
+                data = resp.json()
+                if isinstance(data, dict):
+                    return data.get("result", data.get("data", []))
+                return data
+            elif isinstance(resp, dict):
                 return resp.get("result", resp.get("data", []))
             return resp if isinstance(resp, list) else []
         return self._retry(_fetch)

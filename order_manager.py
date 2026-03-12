@@ -95,9 +95,11 @@ class OrderManager:
                 "product_id": spec.product_id,
                 "size": spec.size,
                 "side": spec.side,
-                "order_type": spec.order_type,
+                # Batch orders strictly require limit_order per Delta Exchange schema
+                "order_type": "limit_order",
             }
-            if spec.order_type == "limit_order" and spec.limit_price > 0:
+            # Delta API requires limit_price as string
+            if getattr(spec, "limit_price", 0) > 0:
                 order["limit_price"] = str(spec.limit_price)
             api_orders.append(order)
 
@@ -163,7 +165,7 @@ class OrderManager:
                 size=size,
                 side=side,
                 order_type="market_order",
-                stop_price=stop_price,
+                stop_price=float(stop_price),
             )
             logger.info(
                 f"🛡️ Hard SL placed on exchange: "
@@ -199,7 +201,7 @@ class OrderManager:
                 size=size,
                 side=side,
                 order_type="limit_order",
-                limit_price=tp_price,
+                limit_price=float(tp_price),
             )
             logger.info(
                 f"🎯 Hard TP placed on exchange: "
