@@ -10,6 +10,7 @@ This script natively handles its own API Execution and bracket SL/TP placement t
 """
 
 import sys
+import os
 import logging
 import json
 from datetime import datetime
@@ -60,6 +61,40 @@ def log_rejection(reason: str, spot_price: float = 0.0, regime_str: str = "UNKNO
         json.dump(summary, f, indent=4)
 
 
+TRADE_LOCK_FILE = ".trade_lock"
+
+def set_trade_lock(strategy: str, spot_price: float):
+    """Write a lock file immediately before placing orders.
+    This prevents duplicate execution if the script crashes and restarts.
+    Delete this file manually ONLY after confirming what happened on Delta Exchange.
+    """
+    now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
+    lock_data = {
+        "locked_at": now_ist.strftime('%Y-%m-%d %H:%M:%S'),
+        "strategy": strategy,
+        "spot_price": round(spot_price, 2),
+        "note": "Delete this file ONLY after manually verifying Delta Exchange positions are correct."
+    }
+    with open(TRADE_LOCK_FILE, "w") as f:
+        json.dump(lock_data, f, indent=4)
+    print(f"\n🔒 Trade lock file written ({TRADE_LOCK_FILE}). Will be cleared on success.")
+
+
+def check_trade_lock():
+    """Check if a lock file exists from a previous execution.
+    Returns True if locked (do NOT proceed), False if clear.
+    """
+    if os.path.exists(TRADE_LOCK_FILE):
+        with open(TRADE_LOCK_FILE, "r") as f:
+            lock_data = json.load(f)
+        print(f"\n🔒 TRADE LOCK DETECTED from {lock_data.get('locked_at')}.")
+        print(f"   Strategy attempted: {lock_data.get('strategy')} | Spot: ${lock_data.get('spot_price')}")
+        print(f"   ⚠️  A previous execution attempt may have partially placed orders.")
+        print(f"   Please verify Delta Exchange positions manually, then delete '{TRADE_LOCK_FILE}' to re-enable.")
+        return True
+    return False
+
+
 def main():
     print("🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...\n")
     exchange = ExchangeClient()
@@ -89,10 +124,17 @@ def main():
             sys.exit(0)
 
         # State Management (Double Entry check)
-        # Fetch open positions directly from Delta Exchange to ensure we don't double enter
+        # Level 1: Check lock file on disk (guards against crash-restart loops)
+        if check_trade_lock():
+            print("🛑 Halting to prevent duplicate orders. Manually review and delete '.trade_lock' to continue.")
+            sys.exit(0)
+
+        # Level 2: Check live open positions on Delta Exchange API
         open_positions = exchange.get_positions()
-        if open_positions:
-            print(f"\n🛑 State Management: Trade already executed/open. Found {len(open_positions)} positions active. Preventing Double-Entry.")
+        # Filter only positions with non-zero size (actual open trades)
+        active_positions = [p for p in (open_positions or []) if abs(int(p.get("size", 0))) > 0]
+        if active_positions:
+            print(f"\n🛑 State Management: {len(active_positions)} active position(s) found on Delta Exchange. Preventing Double-Entry.")
             sys.exit(0)
 
         print(f"\n==================================================")
@@ -367,6 +409,9 @@ def main():
             sys.exit(0)
             
         try:
+            # Write lock file FIRST, before ANY API call to Delta - prevents duplicate on crash/restart
+            set_trade_lock(strategy=strategy_type.value, spot_price=spot_price)
+            
             # 1. Fire limit & market orders for the wings natively
             print("🚀 Routing Multi-Leg Order to Delta Exchange...")
             order_manager.place_batch_orders(order_specs)
@@ -376,6 +421,11 @@ def main():
             order_manager.place_protective_orders(order_specs, net_credit)
             
             print("\n✅ Execution Fully Successful!")
+            
+            # SUCCESS: Remove lock file — execution was clean
+            if os.path.exists(TRADE_LOCK_FILE):
+                os.remove(TRADE_LOCK_FILE)
+                print("🔓 Trade lock released.")
             
             # Send Notification natively
             notifier = Notifier()
@@ -395,10 +445,13 @@ def main():
         except Exception as e:
             reason = f"FATAL ERROR during native Order Routing: {e}"
             print(f"🛑 ALARM: {reason}")
+            print(f"🔒 Lock file '{TRADE_LOCK_FILE}' has been PRESERVED. Manual review required before next run.")
             log_rejection(reason, current_spot, current_regime)
             
             # Alert user of fatal crash
-            Notifier().send_error_alert(reason)
+            Notifier().send_error_alert(
+                f"{reason}\n\n⚠️ Lock file preserved. Check Delta Exchange positions MANUALLY before deleting '.trade_lock'."
+            )
             sys.exit(0)
 
         print("\n--- OPENCLAW JSON PAYLOAD (SUCCESSFULLY EXECUTED) ---")

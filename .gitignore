@@ -22,3 +22,4 @@ trade_log.csv
 # OS
 Thumbs.db
 .DS_Store
+.trade_lock
