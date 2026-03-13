@@ -383,6 +383,16 @@ def main():
             
             print(f"🧠 AI Assessment:\n{ai_rationale}")
             
+            # If AI was skipped due to quota/error, notify user via Telegram
+            if ai_rationale.startswith("\u26a0"):
+                logger.warning(f"AI validation skipped - proceeding on math alone. ({ai_rationale[:100]})")
+                Notifier().send_alert(
+                    f"\u26a0\ufe0f *AI Validation Skipped*\n\n"
+                    f"Gemini API was unavailable (quota/token exhausted).\n"
+                    f"Trade will proceed using *math criteria only*.\n\n"
+                    f"_Stop the bot now if you want AI approval before trades._"
+                )
+            
             if confidence <= 5:
                 reason = f"AI Validation Failed (Confidence {confidence}/10). The mathematical setup looks poor to the AI."
                 print(f"\n🛑 ALARM: {reason} Trade rejected.")

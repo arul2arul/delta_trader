@@ -82,8 +82,29 @@ If the trade feels unusually risky, counter-trend, or if volatility is mysteriou
         }
 
     except Exception as e:
-        logger.error(f"AI Validation API Call Failed: {e}")
-        return {
-            "confidence_score": 10,
-            "rationale": f"API request error: {str(e)}. Proceeding safely purely on math."
-        }
+        error_str = str(e)
+        # Detect quota/token exhaustion specifically
+        if any(k in error_str.lower() for k in ["quota", "resource_exhausted", "429", "rate limit", "token"]):
+            logger.warning(
+                f"AI Validation SKIPPED: Gemini API quota/token exhausted. "
+                f"Trade will proceed on math alone. Error: {error_str[:200]}"
+            )
+            return {
+                "confidence_score": 10,
+                "rationale": (
+                    f"⚠️ Gemini API quota exhausted (429 / ResourceExhausted). "
+                    f"AI check skipped. Trade approved purely on quantitative math criteria."
+                )
+            }
+        else:
+            logger.warning(
+                f"AI Validation SKIPPED: Unexpected API error. "
+                f"Trade will proceed on math alone. Error: {error_str[:200]}"
+            )
+            return {
+                "confidence_score": 10,
+                "rationale": (
+                    f"⚠️ Gemini API error: {error_str[:120]}. "
+                    f"AI check skipped. Trade approved purely on quantitative math criteria."
+                )
+            }
