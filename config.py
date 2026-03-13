@@ -24,6 +24,7 @@ MAX_MARGIN_PCT = 0.60       # Max 60% of capital at risk
 BUFFER_CAPITAL = 80_000     # ₹80,000 buffer (not traded)
 BASE_LOT_SIZE = 10          # The default number of contracts per leg (Used during testing week)
 USE_AI_VALIDATION = True    # Toggle AI second-opinion trade validation
+MIN_NET_CREDIT = 3.0        # Minimum net credit ($) to accept a trade (fee-aware floor)
 
 # ──────────────────────────────────────────────
 # Profit & Loss Thresholds

@@ -289,9 +289,9 @@ def main():
         print(f"\n💵 Est. Net Credit: ${net_credit:.4f}")
         
         # 7. Fee-Aware Exit Check
-        # Average Delta contract fee + slippage buffer ≈ $15 (assuming normal lot sizes)
-        if net_credit < 15.0:
-            reason = f"Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < $15. Trade rejected to avoid 'working for the exchange'."
+        # Configurable via config.MIN_NET_CREDIT to avoid 'working for the exchange'
+        if net_credit < config.MIN_NET_CREDIT:
+            reason = f"Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < ${config.MIN_NET_CREDIT}. Trade rejected."
             print(f"🛑 ALARM: {reason}")
             log_rejection(reason, current_spot, current_regime)
             print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
