@@ -128,14 +128,16 @@ except Exception as e:
 # ─────────────────────────────────────────────────
 section("Google Gemini AI API")
 try:
-    import google.generativeai as genai
+    from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY", "")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=api_key)
 
     # Send a tiny test prompt — minimal token usage
-    response = model.generate_content("Reply with exactly: CONNECTIVITY_OK")
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents="Reply with exactly: CONNECTIVITY_OK"
+    )
     text = response.text.strip()
     if "CONNECTIVITY_OK" in text.upper() or len(text) > 0:
         check("Gemini API key valid", True, "gemini-2.5-flash responded correctly")
@@ -144,7 +146,7 @@ try:
         check("Gemini API key valid", False, f"Unexpected response: {text[:100]}")
 
 except ImportError:
-    check("google-generativeai installed", False, "Run: pip install google-generativeai")
+    check("google-genai installed", False, "Run: pip install google-genai")
 except Exception as e:
     err = str(e)
     if "quota" in err.lower() or "429" in err.lower():

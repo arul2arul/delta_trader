@@ -4,9 +4,10 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger("ai_validator")
 
-# Try importing google.generativeai but don't crash if it isn't available
+# Try importing google.genai (new SDK) but don't crash if it isn't available
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     AI_AVAILABLE = True
 except ImportError:
     AI_AVAILABLE = False
@@ -28,22 +29,18 @@ def ask_ai_for_second_opinion(trade_context: dict) -> dict:
         }
 
     try:
-        genai.configure(api_key=api_key)
-        # Using gemini-2.5-flash for the latest advanced reasoning and speed
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        client = genai.Client(api_key=api_key)
 
-        regime = trade_context.get("regime", "UNKNOWN")
-        spot_price = trade_context.get("spot_price", 0)
-        strategy = trade_context.get("suggested_strategy", "UNKNOWN")
-        net_credit = trade_context.get("net_credit_expected", 0)
-        atr_3d_avg = trade_context.get("atr_3d_avg", 0)
+        regime      = trade_context.get("regime", "UNKNOWN")
+        spot_price  = trade_context.get("spot_price", 0)
+        strategy    = trade_context.get("suggested_strategy", "UNKNOWN")
+        net_credit  = trade_context.get("net_credit_expected", 0)
+        atr_3d_avg  = trade_context.get("atr_3d_avg", 0)
         current_atr = trade_context.get("atr_at_entry", 0)
-        trend_4h = trade_context.get("trend_4h_movement", 0)
-        funding_rate = trade_context.get("funding_rate", 0)
-        
-        # Prepare the exact context payload
-        prompt = f"""
-You are a highly conservative quantitative options trading assistant.
+        trend_4h    = trade_context.get("trend_4h_movement", 0)
+        funding_rate= trade_context.get("funding_rate", 0)
+
+        prompt = f"""You are a highly conservative quantitative options trading assistant.
 Your job is to provide a final sanity check on a 0-DTE crypto options trade proposed by a purely mathematical algorithm.
 
 Here is the current market context:
@@ -56,11 +53,13 @@ Here is the current market context:
 - Expected Net Credit per lot: ${net_credit:.2f}
 
 Based on these quantitative indicators and general macroeconomic context for crypto, write a brief, 2-sentence risk assessment.
-Then, on a new line, write exactly: "CONFIDENCE: X/10", where X is a score from 1 to 10. 
+Then, on a new line, write exactly: "CONFIDENCE: X/10", where X is a score from 1 to 10.
 If the trade feels unusually risky, counter-trend, or if volatility is mysteriously spiking, score it below 5. If it aligns perfectly with the strategy rules, score it 7 or higher.
 """
-        
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         text = response.text.strip()
         
         # Parse the confidence score out of the text
