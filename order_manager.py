@@ -255,6 +255,45 @@ class OrderManager:
                 tp_price=tp_price,
             )
 
+    def wait_for_fills(
+        self,
+        order_specs: list,
+        timeout_sec: int = 60,
+        poll_interval: int = 3,
+    ) -> bool:
+        """
+        Wait until the short (sell) legs show as open positions on Delta Exchange.
+        This is critical — SL/TP placement FAILS if you try before the exchange fills the entry.
+        Returns True if filled, False if timeout reached.
+        """
+        import time
+        sell_product_ids = {s.product_id for s in order_specs if s.side == "sell"}
+        if not sell_product_ids:
+            return True  # No sell legs to wait for
+
+        logger.info(f"Waiting for fills on {len(sell_product_ids)} short leg(s)...")
+        elapsed = 0
+        while elapsed < timeout_sec:
+            try:
+                positions = self.client.get_positions() or []
+                filled_ids = {
+                    int(p.get("product_id", 0))
+                    for p in positions
+                    if abs(int(p.get("size", 0))) > 0
+                }
+                if sell_product_ids.issubset(filled_ids):
+                    logger.info(f"✅ All short legs confirmed filled after {elapsed}s.")
+                    return True
+            except Exception as e:
+                logger.warning(f"Fill-check poll error: {e}")
+
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+            logger.info(f"⏳ Fill-check: {elapsed}s elapsed, waiting...")
+
+        logger.error(f"⏰ Timeout: short legs not confirmed filled after {timeout_sec}s. SL/TP may not be placed.")
+        return False
+
     def close_position(self, product_id: int):
         """Market-close a specific position."""
         try:

@@ -422,11 +422,24 @@ def main():
             # Write lock file FIRST, before ANY API call to Delta - prevents duplicate on crash/restart
             set_trade_lock(strategy=strategy_type.value, spot_price=spot_price)
             
-            # 1. Fire limit & market orders for the wings natively
+            # 1. Fire limit orders for all 4 legs natively
             print("🚀 Routing Multi-Leg Order to Delta Exchange...")
             order_manager.place_batch_orders(order_specs)
             
-            # 2. Fire immediate Hard Stop-Loss and Take-Profit bounds
+            # 2. CRITICAL: Wait for short legs to be confirmed filled before placing SL/TP
+            # Delta Exchange REJECTS bracket orders on positions that don't exist yet
+            print("⏳ Waiting for fill confirmation from Delta Exchange...")
+            fills_confirmed = order_manager.wait_for_fills(order_specs, timeout_sec=60, poll_interval=3)
+            if not fills_confirmed:
+                logger.warning("Fill confirmation timed out. Attempting SL/TP anyway — may fail if not filled.")
+                Notifier().send_alert(
+                    "⚠️ *Fill Confirmation Timeout*\n\n"
+                    "Short legs not confirmed after 60s. SL/TP placement attempted but may need manual check on Delta Exchange."
+                )
+            else:
+                print("✅ Fills confirmed! Proceeding to place protective orders...")
+
+            # 3. Fire Hard Stop-Loss and Take-Profit brackets now that position is confirmed open
             print("🛡️ Placing Exchange-Side Stop Loss & Take Profit Guards...")
             order_manager.place_protective_orders(order_specs, net_credit)
             
