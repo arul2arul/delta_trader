@@ -34,6 +34,11 @@ from ai_validator import ask_ai_for_second_opinion
 from trade_logger import TradeLogger
 from order_manager import OrderManager
 from notifier import Notifier
+from risk_manager import RiskManager
+from monitor import Monitor
+from scheduler import Scheduler
+from ws_client import WebSocketClient
+from config import StrategyType
 
 logging.basicConfig(
     level=logging.WARNING, 
@@ -168,8 +173,31 @@ def main():
             open_positions = exchange.get_positions()
             # Filter only positions with non-zero size (actual open trades)
             active_positions = [p for p in (open_positions or []) if abs(int(p.get("size", 0))) > 0]
+            
+            # Initialize Monitoring Components
+            trade_logger = TradeLogger()
+            risk_manager = RiskManager()
+            scheduler = Scheduler()
+            notifier = Notifier()
+            order_manager = OrderManager(exchange, trade_logger)
+            
             if active_positions:
-                print(f"\n🛑 State Management: {len(active_positions)} active position(s) found on Delta Exchange. Preventing Double-Entry.")
+                print(f"\n🔄 STATE RECOVERY: {len(active_positions)} active position(s) found on Delta Exchange.")
+                print("   Resuming monitoring loop to protect capital...")
+                
+                # Determine strategy
+                strategy = StrategyType.IRON_CONDOR if len(active_positions) >= 4 else StrategyType.BULL_CREDIT_SPREAD
+                
+                # Register premiums for risk tracking
+                for p in active_positions:
+                    risk_manager.register_premium(int(p.get("product_id", 0)), float(p.get("avg_entry_price", 0)))
+                
+                # Initialize Monitor and Handoff
+                ws_client = WebSocketClient(exchange)
+                monitor = Monitor(exchange, market_data, ws_client, risk_manager, order_manager, notifier, trade_logger, scheduler)
+                
+                notifier.send_alert(f"🔄 *Recovery Mode*: Bot restarted and found an active {strategy.value.upper()} trade. Resuming monitoring.")
+                monitor.start_monitoring_loop(strategy)
                 sys.exit(0)
     
             print(f"\n==================================================")
@@ -537,10 +565,12 @@ def main():
             # Save Trade Decision Context for Post-Trade Logger to evaluate EOD
             with open("daily_trade_context.json", "w") as f:
                 json.dump(trade_context, f, indent=4)
-            logger.info("Saved 'daily_trade_context.json' for EOD verification.")
+            # Instead of exiting, enter the monitoring loop to watch the trade natively
+            print("\n📈 ENTERING MONITORING LOOP... (AI & Risk Guards Active)")
+            ws_client = WebSocketClient(exchange)
+            monitor = Monitor(exchange, market_data, ws_client, risk_manager, order_manager, notifier, trade_logger, scheduler)
+            monitor.start_monitoring_loop(strategy_type)
             
-            
-            # Exit successfully to OpenClaw execution after rendering a valid payload
             sys.exit(0)
         except (ConnectionError, TimeoutError) as e:
             print(f"📡 Network Glitch: {e}. Retrying in 10s...")

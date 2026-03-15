@@ -97,6 +97,48 @@ class DeltaTrader:
         logger.info("Shutdown complete.")
         sys.exit(0)
 
+    def _recover_state(self):
+        """
+        State Awareness Recovery:
+        Check for open positions at startup to resume monitoring if the bot was restarted.
+        """
+        logger.info("🔍 Checking for existing positions (State Recovery Check)...")
+        try:
+            positions = self.exchange.get_positions()
+            active = [p for p in (positions or []) if abs(int(p.get("size", 0))) > 0]
+            
+            if active:
+                logger.info(f"🔄 RECOVERY: Found {len(active)} active legs on Delta Exchange!")
+                
+                # Identify strategy by leg count
+                if len(active) >= 4:
+                    self._current_strategy = StrategyType.IRON_CONDOR
+                else:
+                    self._current_strategy = StrategyType.BULL_CREDIT_SPREAD # Default to spread monitoring
+                
+                self._deployed_today = True
+                
+                # Register premiums with risk manager for PnL tracking
+                for p in active:
+                    # Note: Delta 'avg_entry_price' for options is the premium
+                    product_id = int(p.get("product_id", 0))
+                    avg_price = float(p.get("avg_entry_price", 0))
+                    if product_id and avg_price:
+                        self.risk_manager.register_premium(product_id, avg_price)
+
+                self.notifier.send_alert(
+                    f"🔄 *Recovery System Active*\n\n"
+                    f"Detected {len(active)} open legs on Delta Exchange.\n"
+                    f"Bot has successfully resumed monitoring for *{self._current_strategy.value.upper()}*."
+                )
+                return True
+            else:
+                logger.info("✅ No existing positions found. Proceeding with fresh state.")
+                return False
+        except Exception as e:
+            logger.error(f"⚠️ Error during state recovery: {e}")
+            return False
+
     def preflight_checks(self) -> bool:
         """
         Phase 1: Verify surroundings before risking capital.
@@ -125,6 +167,9 @@ class DeltaTrader:
                 f"Insufficient balance: ₹{balance:,.2f}"
             )
             return False
+
+        # 4. State Recovery Check
+        self._recover_state()
 
         logger.info(f"✅ Preflight checks PASSED (balance: ₹{balance:,.2f})")
         return True
