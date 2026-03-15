@@ -217,19 +217,50 @@ class DeltaTrader:
             logger.info("Step 5b: Fetching spot price...")
             spot_price = self.market_data.get_spot_price()
 
-            # Step 6: Build strategy
-            logger.info("Step 6: Building strategy...")
+            # Step 6: Build strategy (Dry Run for dynamic lots)
+            logger.info("Step 6: Building strategy (Dry Run for dynamic lots)...")
+            _, dry_run_specs = build_strategy(
+                regime=regime,
+                chain=chain,
+                spot_price=spot_price,
+                wide_wings=wide_wings,
+                lot_size=1
+            )
+            
+            if not dry_run_specs:
+                logger.error("Dry run strategy produced no orders. Aborting.")
+                self.notifier.send_error_alert("Dry run produced no orders")
+                return False
+                
+            # Dynamic Lot Size Calculation
+            balance = self.exchange.get_wallet_balance()
+            balance_usd = balance / config.USD_INR_RATE if balance > 1000 else balance
+            
+            # Calculate net premium for 1 lot (0.001 BTC)
+            prem_coll = sum(leg.limit_price for leg in dry_run_specs if leg.side == "sell")
+            prem_paid = sum(leg.limit_price for leg in dry_run_specs if leg.side == "buy")
+            net_prem_1_lot = prem_coll - prem_paid
+            net_premium_per_btc = net_prem_1_lot / 0.001
+            
+            final_lots = self.risk_manager.calculate_safe_dynamic_lots(
+                available_balance_usd=balance_usd,
+                net_premium_per_btc=net_premium_per_btc,
+                spot_price=spot_price
+            )
+            
+            if final_lots <= 0:
+                logger.error(f"❌ Safety-First: Calculated lot size is {final_lots}. Aborting trade.")
+                self.notifier.send_error_alert(f"Safety-First blocking trade: 0 lots calculated.")
+                return False
+                
+            logger.info(f"Step 6b: Building final strategy with {final_lots} lots...")
             strategy_type, order_specs = build_strategy(
                 regime=regime,
                 chain=chain,
                 spot_price=spot_price,
                 wide_wings=wide_wings,
+                lot_size=final_lots
             )
-
-            if not order_specs:
-                logger.error("Strategy produced no orders. Aborting.")
-                self.notifier.send_error_alert("Strategy produced no orders")
-                return False
 
             # Step 7: Validate margin
             logger.info("Step 7: Validating margin...")

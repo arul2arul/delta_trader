@@ -17,21 +17,36 @@ PRODUCTION_WS_URL = "wss://socket.india.delta.exchange"
 TESTNET_WS_URL = "wss://socket-ind.testnet.deltaex.org"
 
 # ──────────────────────────────────────────────
-# Capital & Margin
+# Risk & Capital Preservation Rules
 # ──────────────────────────────────────────────
-CAPITAL = 120_000           # ₹1,20,000 margin allocation
-MAX_MARGIN_PCT = 0.60       # Max 60% of capital at risk
-BUFFER_CAPITAL = 80_000     # ₹80,000 buffer (not traded)
-BASE_LOT_SIZE = 10          # The default number of contracts per leg (Used during testing week)
-USE_AI_VALIDATION = True    # Toggle AI second-opinion trade validation
-MIN_NET_CREDIT = 3.0        # Minimum net credit ($) to accept a trade (fee-aware floor)
+TOTAL_CAPITAL_INR = 90_000   
+CAPITAL = TOTAL_CAPITAL_INR     # Unified with new user request
+MAX_DAILY_LOSS_LIMIT = -4_500  # Kill-switch at 5% of capital
+KILL_SWITCH_LOSS = MAX_DAILY_LOSS_LIMIT
+
+STARTING_PROFIT_TARGET = 500   # Start small (Gradual Growth Rule)
+ULTIMATE_PROFIT_TARGET = 2_000 # Scaling goal after 7 days of wins
+
+USD_INR_RATE = 83.0            # Estimated rate for USD conversion
+
+# ──────────────────────────────────────────────
+# Dynamic Margin Guards
+# ──────────────────────────────────────────────
+MARGIN_BUFFER_PCT = 0.20       # Keep 20% of available margin untouched for wicks
+EST_INITIAL_MARGIN_PCT = 0.02  # Assume 2% margin requirement (Conservative)
+RESERVE_FOR_FEES_INR = 1_000   # Hard cash reserve for transaction costs
+MAX_MARGIN_PCT = 0.60          # Legacy support
+
+BASE_LOT_SIZE = 10             # Fallback
+USE_AI_VALIDATION = True       
+MIN_NET_CREDIT = 3.0           
 
 # ──────────────────────────────────────────────
 # Profit & Loss Thresholds
 # ──────────────────────────────────────────────
-KILL_SWITCH_LOSS = -8_500   # Force-close all positions at -₹8,500 (approx $100)
+# KILL_SWITCH_LOSS is now linked to MAX_DAILY_LOSS_LIMIT above
 STOPLOSS_MULTIPLIER = 2.5   # Per-leg stop: 2.5× premium collected
-TARGET_DAILY_NET = 1_000    # ₹1,000 net daily target
+TARGET_DAILY_NET = 1_000    # Initial manual target
 
 # ──────────────────────────────────────────────
 # Strike Selection (Delta-based)

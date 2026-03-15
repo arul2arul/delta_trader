@@ -244,6 +244,87 @@ class RiskManager:
             "total_pnl": total_pnl,
         }
 
+    def get_current_profit_target(self) -> float:
+        """
+        Calculates the dynamic profit target based on the Gradual Growth plan.
+        - Days 1-5: ₹500
+        - Days 6-10: ₹1000 (if profitable)
+        - Days 11+: ₹2000 (if profitable)
+        """
+        import os
+        import pandas as pd
+        
+        target = config.STARTING_PROFIT_TARGET
+        
+        if not os.path.exists(config.TRADE_LOG_FILE):
+            return target
+            
+        try:
+            df = pd.read_csv(config.TRADE_LOG_FILE)
+            if df.empty:
+                return target
+                
+            # Count unique days where a trade was CLOSED (completed cycle)
+            closed_trades = df[df['action'] == 'CLOSE']
+            if closed_trades.empty:
+                return target
+                
+            unique_days = pd.to_datetime(df['timestamp']).dt.date.nunique()
+            total_realized = df[df['realized_pnl'].notnull()]['realized_pnl'].sum()
+            
+            if unique_days >= 11 and total_realized > 0:
+                target = config.ULTIMATE_PROFIT_TARGET
+            elif unique_days >= 6 and total_realized > 0:
+                target = 1000
+            
+            logger.info(f"📈 Gradual Growth Check: Day {unique_days} | Total Realized: ₹{total_realized:,.2f} | Current Target: ₹{target}")
+        except Exception as e:
+            logger.warning(f"⚠️ Error checking trade history for Gradual Growth: {e}. Defaulting to ₹{target}")
+            
+        return target
+
+    def calculate_safe_dynamic_lots(self, available_balance_usd: float, net_premium_per_btc: float, spot_price: float) -> int:
+        """
+        Implements the 'Safety-First' lot calculation across 3 constraints:
+        1. Available Margin (Broker Constraint)
+        2. Profit Target (User Goal)
+        3. Hard Capital Risk (Safety Constraint)
+        
+        Returns the SMALLEST (safest) of the three.
+        """
+        # 1. Usable Margin calculation (with buffer and fee reserve)
+        usable_margin_usd = available_balance_usd * (1 - config.MARGIN_BUFFER_PCT)
+        fee_reserve_usd = config.RESERVE_FOR_FEES_INR / config.USD_INR_RATE
+        usable_margin_usd = max(0, usable_margin_usd - fee_reserve_usd)
+        
+        # CONSTRAINT A: Margin Cap
+        # Margin per lot ≈ Spot * 0.001 * Initial Margin Rate
+        margin_per_lot = spot_price * 0.001 * config.EST_INITIAL_MARGIN_PCT
+        max_lots_by_margin = int(usable_margin_usd / margin_per_lot) if margin_per_lot > 0 else 0
+        
+        # CONSTRAINT B: Profit Target Cap
+        current_target_inr = self.get_current_profit_target()
+        current_target_usd = current_target_inr / config.USD_INR_RATE
+        # Lots = Target / (Premium per BTC * 0.001)
+        lots_for_target = int(current_target_usd / (net_premium_per_btc * 0.001)) if net_premium_per_btc > 0 else 0
+        
+        # CONSTRAINT C: Hard Safety Cap
+        hard_cap = 1000
+        
+        # The Selection: Picking the most conservative
+        final_lots = min(max_lots_by_margin, lots_for_target, hard_cap)
+        # Minimum floored to 1 lot if any calculation resulted in 0 but we have margin
+        if final_lots <= 0 and max_lots_by_margin > 0:
+            final_lots = 1
+            
+        # LOGGING FOR QE ANALYST
+        logger.info(f"--- Dynamic Lot Calculation (Safety First) ---")
+        logger.info(f"Available: ${available_balance_usd:.2f} | Usable: ${usable_margin_usd:.2f}")
+        logger.info(f"Margin Cap: {max_lots_by_margin} | Target Cap: {lots_for_target} (Target: ₹{current_target_inr})")
+        logger.info(f"Decision: Final Lots = {final_lots}")
+        
+        return final_lots
+
     @property
     def is_day_done(self) -> bool:
         """Check if the trading day is over (kill or payday triggered)."""

@@ -139,6 +139,8 @@ def main():
     print("🕒 Checking clock synchronization with Delta servers...")
     exchange.check_time_sync()
 
+    risk_manager = RiskManager()
+
     POLL_INTERVAL_SEC = 5 * 60  # 5 minutes
     START_HOUR = 12             # 12:00 PM IST
     CUTOFF_HOUR = 13            # 1:00 PM IST
@@ -176,7 +178,6 @@ def main():
             
             # Initialize Monitoring Components
             trade_logger = TradeLogger()
-            risk_manager = RiskManager()
             scheduler = Scheduler()
             notifier = Notifier()
             order_manager = OrderManager(exchange, trade_logger)
@@ -345,17 +346,64 @@ def main():
                 continue
             
             # 6. Build Strategy and get exact order specs (Strikes / Legs)
-            print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()} ({config.BASE_LOT_SIZE} Lots)")
+            # DYNAMIC LOT CALCULATION: Fetch balance and perform dry-run build first
+            print("\n⚙️  Calculating Dynamic Lot Size (Safety First)...")
+            wallet_balance = exchange.get_wallet_balance()
+            # Convert INR balance to USD for the risk manager's constraints
+            balance_usd = wallet_balance / config.USD_INR_RATE if wallet_balance > 1000 else wallet_balance
+            
+            # Dry-run with 1 lot to find the net premium per BTC
+            try:
+                _, dry_run_specs = build_strategy(
+                    regime=regime,
+                    chain=chain,
+                    spot_price=spot_price,
+                    wide_wings=wide_wings,
+                    lot_size=1
+                )
+                if not dry_run_specs:
+                    raise ValueError("No valid strikes for dry-run")
+                
+                # Calculate net premium for 1 lot (0.001 BTC)
+                prem_coll = sum(leg.limit_price for leg in dry_run_specs if leg.side == "sell")
+                prem_paid = sum(leg.limit_price for leg in dry_run_specs if leg.side == "buy")
+                net_prem_1_lot = prem_coll - prem_paid
+                # Convert to per 1.0 BTC for the risk manager's formula
+                net_premium_per_btc = net_prem_1_lot / 0.001
+                
+                final_lots = risk_manager.calculate_safe_dynamic_lots(
+                    available_balance_usd=balance_usd,
+                    net_premium_per_btc=net_premium_per_btc,
+                    spot_price=spot_price
+                )
+                
+                if final_lots <= 0:
+                    reason = f"Calculated lot size is 0. Safety constraints blocked trade."
+                    print(f"🛑 {reason}")
+                    log_rejection(reason, current_spot, current_regime)
+                    print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                    time.sleep(POLL_INTERVAL_SEC)
+                    continue
+                    
+            except Exception as e:
+                reason = f"Error during dry-run lot calculation: {e}"
+                print(f"❌ {reason}")
+                log_rejection(reason, current_spot, current_regime)
+                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                time.sleep(POLL_INTERVAL_SEC)
+                continue
+
+            print(f"⚙️  Building final orders for: {suggested_strategy.value.replace('_', ' ').title()} ({final_lots} Lots)")
             try:
                 strategy_type, order_specs = build_strategy(
                     regime=regime,
                     chain=chain,
                     spot_price=spot_price,
                     wide_wings=wide_wings,
-                    lot_size=config.BASE_LOT_SIZE
+                    lot_size=final_lots
                 )
             except Exception as e:
-                reason = f"Error building strategy: {e}"
+                reason = f"Error building final strategy: {e}"
                 print(f"❌ {reason}")
                 log_rejection(reason, current_spot, current_regime)
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
