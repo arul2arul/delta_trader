@@ -248,6 +248,17 @@ def main():
             iv_rank = market_data.get_iv_rank(chain)
             wide_wings = check_volatility(iv_rank)
             print(f"⚡ IV Rank: {iv_rank:.1f}% (Wide Wings: {wide_wings})")
+
+            # Calculate Hours to Expiry for AI Gamma Check
+            hours_to_exp = 24.0
+            if chain:
+                try:
+                    expiry_str = chain[0].get("expiry", "")
+                    if expiry_str:
+                        exp_dt = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
+                        now_utc = datetime.now(pytz.UTC)
+                        hours_to_exp = (exp_dt - now_utc).total_seconds() / 3600
+                except: pass
             
             # IV Rank Floor Filter for Iron Condors (Vega Risk Protection)
             if suggested_strategy == config.StrategyType.IRON_CONDOR and iv_rank < config.IV_ENTRY_MIN:
@@ -328,6 +339,7 @@ def main():
             # 6. Fetch Alternative Data (Sentiment & Liquidity)
             funding_rate = market_data.get_funding_rate()
             ob_imbalance = market_data.get_orderbook_imbalance("BTCUSD")
+            ob_depth = market_data.get_top_5_orderbook_depth("BTCUSD")
             
             # Immediate Math Blocking on Sentiment Extremes
             if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
@@ -486,6 +498,9 @@ def main():
                 "net_credit_expected": net_credit,
                 "funding_rate": funding_rate,
                 "ob_imbalance": ob_imbalance,
+                "ob_depth": ob_depth,
+                "hours_to_expiry": hours_to_exp,
+                "final_lots": final_lots,
                 "recommended_orders": api_payload
             }
     
@@ -509,7 +524,7 @@ def main():
                         f"_Stop the bot now if you want AI approval before trades._"
                     )
                 
-                if confidence <= 5:
+                if confidence < 6:
                     reason = f"AI Validation Failed (Confidence {confidence}/10). The mathematical setup looks poor to the AI."
                     print(f"\n🛑 ALARM: {reason} Trade rejected.")
                     log_rejection(reason, current_spot, current_regime)
