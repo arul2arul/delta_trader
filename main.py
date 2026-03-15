@@ -13,6 +13,7 @@ import sys
 import time
 import logging
 import signal
+from wakepy import keep
 from datetime import datetime
 
 import pytz
@@ -348,4 +349,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with keep.presenting():
+        main()

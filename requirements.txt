@@ -11,3 +11,4 @@ python-telegram-bot>=20.0
 ntplib>=0.4.0
 tinydb>=4.8.0
 google-genai>=1.0.0
+wakepy>=0.7.1

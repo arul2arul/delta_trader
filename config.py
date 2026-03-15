@@ -75,8 +75,8 @@ WEEKEND_RESUME_HOUR = 9     # 9:00 AM IST
 # ──────────────────────────────────────────────
 # Monitoring & Polling
 # ──────────────────────────────────────────────
-PNL_POLL_IRON_CONDOR = 90   # seconds – wide buffer strategy
-PNL_POLL_CREDIT_SPREAD = 45 # seconds – tighter strategy
+PNL_POLL_IRON_CONDOR = 120   # seconds – wide buffer strategy (increased for latency buffer)
+PNL_POLL_CREDIT_SPREAD = 60 # seconds – tighter strategy (increased for latency buffer)
 USE_WEBSOCKET = True        # Use WebSocket for real-time updates
 
 # ──────────────────────────────────────────────

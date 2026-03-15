@@ -17,6 +17,7 @@ from datetime import datetime
 import time
 import pytz
 import io
+from wakepy import keep
 
 # Force UTF-8 output to handle emojis on Windows
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -512,4 +513,5 @@ def main():
         sys.exit(0)
 
 if __name__ == "__main__":
-    main()
+    with keep.presenting():
+        main()
