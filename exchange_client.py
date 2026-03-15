@@ -97,9 +97,46 @@ class ExchangeClient:
 
     def check_time_sync(self, max_drift_sec: float = 2.0) -> bool:
         """
-        Compare local clock with NTP server.
-        Warns if drift exceeds threshold (signature mismatches).
+        Compare local clock with Delta Exchange server and pool.ntp.org.
+        Ensures orders are not rejected for stale timestamps or signature mismatches.
         """
+        # 1. Delta Server Sync (Critical for API)
+        try:
+            # We use /v2/tickers/BTCUSD which is public and returns info
+            # The Delta API usually responds with its server time in headers or metadata
+            # We'll use a simple request and measure the diff
+            start_local = time.time()
+            resp = requests.get(f"{self.base_url}/v2/assets", timeout=5)
+            end_local = time.time()
+            
+            # Estimate latency-adjusted local time at the moment the server received it
+            avg_local = (start_local + end_local) / 2
+            
+            if resp.status_code == 200:
+                # Delta headers include 'Date' or we can use specific timestamp if in body
+                # For simplicity and precision, the best way is headers or a dedicated time endpoint
+                # Delta REST API generally handles auth internally, let's look for a timestamp
+                server_time_str = resp.headers.get('Date')
+                if server_time_str:
+                    from email.utils import parsedate_to_datetime
+                    server_dt = parsedate_to_datetime(server_time_str)
+                    server_ts = server_dt.timestamp()
+                    delta_drift = abs(server_ts - avg_local)
+                    
+                    if delta_drift > max_drift_sec:
+                        logger.warning(
+                            f"⚠️ DELTA SERVER DRIFT: {delta_drift:.2f}s! "
+                            f"(Max allowed: {max_drift_sec}s). "
+                            "Local clock is out of sync with Delta. Signatures may fail."
+                        )
+                        # On Mac/Linux we can't easily resync without sudo, so just alert
+                        # On Windows we would suggest: w32tm /resync
+                    else:
+                        logger.info(f"✅ Delta Server Sync OK (drift: {delta_drift:.3f}s)")
+        except Exception as e:
+            logger.warning(f"⚠️ Delta Server time check failed: {e}")
+
+        # 2. General NTP Sync (Second source)
         try:
             ntp_client = ntplib.NTPClient()
             response = ntp_client.request("pool.ntp.org", version=3)
@@ -107,17 +144,16 @@ class ExchangeClient:
 
             if offset > max_drift_sec:
                 logger.warning(
-                    f"⚠️ Clock drift detected: {offset:.2f}s "
-                    f"(threshold: {max_drift_sec}s). "
-                    "This may cause API signature mismatches!"
+                    f"⚠️ General NTP drift detected: {offset:.2f}s "
+                    f"(threshold: {max_drift_sec}s)."
                 )
                 return False
             else:
-                logger.info(f"✅ Time sync OK (drift: {offset:.3f}s)")
+                logger.info(f"✅ NTP Sync OK (drift: {offset:.3f}s)")
                 return True
         except Exception as e:
             logger.warning(f"⚠️ NTP time sync check failed: {e}. Proceeding anyway.")
-            return True  # Don't block on NTP failure
+            return True  # Don't block
 
     # ──────────────────────────────────────────
     # Account

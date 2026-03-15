@@ -99,6 +99,10 @@ def main():
     print("🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...\n")
     exchange = ExchangeClient()
     market_data = MarketData(exchange)
+    
+    # Check Time Sync at startup to avoid "Delta Drift"
+    print("🕒 Checking clock synchronization with Delta servers...")
+    exchange.check_time_sync()
 
     POLL_INTERVAL_SEC = 5 * 60  # 5 minutes
     START_HOUR = 12             # 12:00 PM IST
