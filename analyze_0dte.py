@@ -259,33 +259,27 @@ def main():
             continue
             
         if widening_gap and regime != config.Regime.SIDEWAYS:
-            # If gap is widening against trend... wait, if trend is against, but our strategy is matching regime.
             print(f"⚠️ Momentum Gap Widening (${curr_gap:.2f}). Proceed with caution.")
             
-        # 1:30 PM Funding Check
-        now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
-        # If the time is around 1:00 PM - 2:00 PM IST
-        if now_ist.hour == 13:
-            funding_rate = market_data.get_funding_rate()
-            print(f"🕒 1:30 PM Funding Check triggered. Current Funding Rate: {funding_rate * 100:.4f}%")
-            
-            # Funding rate > 0 means Longs pay Shorts. Meaning heavily biased bullish sentiment.
-            # Too high positive rate = dangerous to go long, dangerous for Bull Spreads.
-            # If negative, heavily biased bearish shorting, dangerous for Bear Spreads.
-            if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
-                reason = "Funding Rate extremely positive. Too much long leverage in the market. Blocking Bull Put Spread."
-                print(f"🛑 ALARM: {reason}")
-                log_rejection(reason, current_spot, current_regime)
-                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
-                time.sleep(POLL_INTERVAL_SEC)
-                continue
-            elif funding_rate < -0.0005 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
-                reason = "Funding Rate extremely negative. Too much short leverage in the market. Blocking Bear Call Spread."
-                print(f"🛑 ALARM: {reason}")
-                log_rejection(reason, current_spot, current_regime)
-                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
-                time.sleep(POLL_INTERVAL_SEC)
-                continue
+        # 6. Fetch Alternative Data (Sentiment & Liquidity)
+        funding_rate = market_data.get_funding_rate()
+        ob_imbalance = market_data.get_orderbook_imbalance("BTCUSD")
+        
+        # Immediate Math Blocking on Sentiment Extremes
+        if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
+            reason = f"Funding Rate ({funding_rate*100:.4f}%) extremely positive. Market overheated. Blocking Bull Spread."
+            print(f"🛑 Safe Entry Filter: {reason}")
+            log_rejection(reason, current_spot, current_regime)
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+        elif funding_rate < -0.0005 and suggested_strategy == config.StrategyType.BEAR_CREDIT_SPREAD:
+            reason = f"Funding Rate ({funding_rate*100:.4f}%) extremely negative. Squeeze risk. Blocking Bear Spread."
+            print(f"🛑 Safe Entry Filter: {reason}")
+            log_rejection(reason, current_spot, current_regime)
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
         
         # 6. Build Strategy and get exact order specs (Strikes / Legs)
         print(f"\n⚙️  Building orders for: {suggested_strategy.value.replace('_', ' ').title()} ({config.BASE_LOT_SIZE} Lots)")
@@ -378,7 +372,8 @@ def main():
             "consolidation_range_60m": range_60m,
             "suggested_strategy": strategy_type.value,
             "net_credit_expected": net_credit,
-            "funding_rate": funding_rate if now_ist.hour == 13 else 0, # Pass from above if available
+            "funding_rate": funding_rate,
+            "ob_imbalance": ob_imbalance,
             "recommended_orders": api_payload
         }
 

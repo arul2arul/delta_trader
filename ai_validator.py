@@ -38,7 +38,8 @@ def ask_ai_for_second_opinion(trade_context: dict) -> dict:
         atr_3d_avg  = trade_context.get("atr_3d_avg", 0)
         current_atr = trade_context.get("atr_at_entry", 0)
         trend_4h    = trade_context.get("trend_4h_movement", 0)
-        funding_rate= trade_context.get("funding_rate", 0)
+        funding_rate = trade_context.get("funding_rate", 0)
+        ob_imbalance = trade_context.get("ob_imbalance", 0)
 
         prompt = f"""You are a highly conservative quantitative options trading assistant.
 Your job is to provide a final sanity check on a 0-DTE crypto options trade proposed by a purely mathematical algorithm.
@@ -48,13 +49,19 @@ Here is the current market context:
 - Market Regime Detected: {regime}
 - 1-Hour ATR: {current_atr:.2f} (Average is {atr_3d_avg:.2f})
 - 4-Hour Trend Momentum: ${trend_4h:.2f}
-- Funding Rate (Sentiment): {funding_rate}
+- Funding Rate (Sentiment): {funding_rate} (Positive = Bullish sentiment/Long leverage, Negative = Bearish sentiment/Short leverage)
+- Order Book Imbalance: {ob_imbalance:.2f} (-1.0 to 1.0, where -1.0 is extreme sell pressure and 1.0 is extreme buy pressure)
 - The proposed Strategy is: {strategy}
 - Expected Net Credit per lot: ${net_credit:.2f}
 
-Based on these quantitative indicators and general macroeconomic context for crypto, write a brief, 2-sentence risk assessment.
+CRITICAL ASSESSMENT RULES:
+1. SQUEEZE RISK: If the funding rate is extremely negative and price is moving up, or vice versa, warn of a potential "Short Squeeze" or "Long Squeeze".
+2. STOP LOSS CLUSTERS: Look at the Order Book Imbalance. If a "Sideways" strategy is proposed but imbalance is heavily skewed (>0.4 or <-0.4), warn that "Stop Loss Clusters" are likely being targeted, making the trade risky.
+3. LIQUIDITY: High imbalance combined with high ATR suggests a breakout is imminent. Block "Sideways" strategies in these cases.
+
+Write a brief, 2-sentence risk assessment based on these deep liquidity signals.
 Then, on a new line, write exactly: "CONFIDENCE: X/10", where X is a score from 1 to 10.
-If the trade feels unusually risky, counter-trend, or if volatility is mysteriously spiking, score it below 5. If it aligns perfectly with the strategy rules, score it 7 or higher.
+Score below 5 if there is a squeeze risk or targeted stop clusters.
 """
         response = client.models.generate_content(
             model="gemini-2.5-flash",

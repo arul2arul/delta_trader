@@ -215,6 +215,19 @@ class ExchangeClient:
             return resp
         return self._retry(_fetch)
 
+    def get_l2_orderbook(self, symbol: str):
+        """Fetch L2 Order Book for a symbol."""
+        def _fetch():
+            # /v2/l2orderbook/{symbol}
+            resp = self._delta_client.request("GET", f"/v2/l2orderbook/{symbol}")
+            if hasattr(resp, "json"):
+                data = resp.json()
+                if isinstance(data, dict):
+                    return data.get("result", data.get("data", {}))
+                return data
+            return resp
+        return self._retry(_fetch)
+
     def get_candles(self, symbol: str, resolution: str, start: int, end: int):
         """Fetch OHLCV candle data."""
         def _fetch():

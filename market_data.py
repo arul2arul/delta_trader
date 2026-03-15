@@ -287,3 +287,30 @@ class MarketData:
         except Exception as e:
             logger.error(f"Failed to fetch funding rate: {e}")
             return 0.0
+
+    def get_orderbook_imbalance(self, symbol: str = "BTCUSD") -> float:
+        """
+        Calculate Order Book Imbalance (Net Buy/Sell pressure).
+        Checks top 10 levels of bids vs asks.
+        Returns a value from -1.0 (heavy sell side) to 1.0 (heavy buy side).
+        """
+        try:
+            data = self.client.get_l2_orderbook(symbol)
+            if not data:
+                return 0.0
+            
+            bids = data.get("bids", [])[:10]
+            asks = data.get("asks", [])[:10]
+            
+            bid_vol = sum(float(b[1]) for b in bids)
+            ask_vol = sum(float(a[1]) for a in asks)
+            
+            if bid_vol + ask_vol == 0:
+                return 0.0
+                
+            imbalance = (bid_vol - ask_vol) / (bid_vol + ask_vol)
+            logger.info(f"Order Book Imbalance ({symbol}): {imbalance:.2f} (Bid: {bid_vol:.1f}, Ask: {ask_vol:.1f})")
+            return imbalance
+        except Exception as e:
+            logger.error(f"Failed to calculate imbalance: {e}")
+            return 0.0
