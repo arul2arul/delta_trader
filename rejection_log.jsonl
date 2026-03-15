@@ -11,3 +11,25 @@
 {"timestamp": "2026-03-12 12:53:12", "spot_price": 69564.32, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $6.40 is < $15. Trade rejected to avoid 'working for the exchange'.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-12 12:58:16", "spot_price": 69571.28, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $5.12 is < $15. Trade rejected to avoid 'working for the exchange'.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-12 12:58:28", "spot_price": 69563.4, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $4.99 is < $15. Trade rejected to avoid 'working for the exchange'.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:02:58", "spot_price": 70702.39, "regime": "bearish", "reason": "AI Validation Failed (Confidence 5/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:08:52", "spot_price": 70525.39, "regime": "bearish", "reason": "60m Consolidation range is $436.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:13:54", "spot_price": 70424.06, "regime": "bearish", "reason": "60m Consolidation range is $740.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:18:57", "spot_price": 70618.68, "regime": "bearish", "reason": "60m Consolidation range is $714.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:23:59", "spot_price": 70610.93, "regime": "bearish", "reason": "60m Consolidation range is $714.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:29:02", "spot_price": 70615.54, "regime": "bearish", "reason": "60m Consolidation range is $714.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:34:06", "spot_price": 70640.22, "regime": "bearish", "reason": "60m Consolidation range is $618.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:39:08", "spot_price": 70605.53, "regime": "bearish", "reason": "60m Consolidation range is $618.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:44:10", "spot_price": 70690.43, "regime": "bearish", "reason": "60m Consolidation range is $618.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:49:14", "spot_price": 70663.58, "regime": "bearish", "reason": "60m Consolidation range is $444.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:54:20", "spot_price": 70559.52, "regime": "bearish", "reason": "60m Consolidation range is $444.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 12:59:23", "spot_price": 70634.61, "regime": "bearish", "reason": "60m Consolidation range is $444.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:04:30", "spot_price": 70664.39, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.49 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:09:33", "spot_price": 70554.34, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.11 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:14:36", "spot_price": 70525.47, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.33 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:19:46", "spot_price": 70498.15, "regime": "bearish", "reason": "AI Validation Failed (Confidence 5/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:24:48", "spot_price": 70550.03, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.23 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:29:52", "spot_price": 70559.88, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.25 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:34:55", "spot_price": 70580.18, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:39:57", "spot_price": 70615.55, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:44:59", "spot_price": 70673.51, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.74 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:49:59", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}
