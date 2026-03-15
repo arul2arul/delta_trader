@@ -18,6 +18,7 @@ import time
 import pytz
 import io
 from wakepy import keep
+from logging.handlers import RotatingFileHandler
 
 # Force UTF-8 output to handle emojis on Windows
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -38,7 +39,7 @@ logging.basicConfig(
     level=logging.WARNING, 
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("brain_execution.log"),
+        RotatingFileHandler("brain_execution.log", maxBytes=10*1024*1024, backupCount=5),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -46,7 +47,7 @@ logger = logging.getLogger("analyze_0dte")
 # We want to explicitly log our decision-making heavily to the file
 logger.setLevel(logging.INFO)
 
-def log_rejection(reason: str, spot_price: float = 0.0, regime_str: str = "UNKNOWN"):
+def log_rejection(reason: str, spot_price: float = 0.0, regime_str: str = "UNKNOWN", context: dict = None):
     """Saves a simple summary of why the bot chose not to trade this cycle."""
     now_ist = datetime.now(pytz.timezone(config.TIMEZONE))
     summary = {
@@ -56,10 +57,38 @@ def log_rejection(reason: str, spot_price: float = 0.0, regime_str: str = "UNKNO
         "reason": reason,
         "status": "NO_TRADE"
     }
+    if context:
+        summary["context"] = context
+        
     with open("rejection_log.jsonl", "a") as f:
         f.write(json.dumps(summary) + "\n")
     with open("latest_status.json", "w") as f:
         json.dump(summary, f, indent=4)
+
+
+def get_market_liquidity_context(chain: list[dict]) -> dict:
+    """Extracts liquidity stats (spreads) for QE verification."""
+    if not chain:
+        return {"error": "empty_chain"}
+    
+    spreads = []
+    for opt in chain:
+        bid = float(opt.get("best_bid", 0))
+        ask = float(opt.get("best_ask", 0))
+        mark = float(opt.get("mark_price", 0))
+        if mark > 0:
+            spreads.append((ask - bid) / mark)
+    
+    if not spreads:
+        return {"error": "no_valid_quotes"}
+        
+    spreads.sort()
+    return {
+        "median_spread_pct": round(spreads[len(spreads)//2], 4),
+        "max_spread_pct": round(max(spreads), 4),
+        "min_spread_pct": round(min(spreads), 4),
+        "quote_count": len(spreads)
+    }
 
 
 TRADE_LOCK_FILE = ".trade_lock"
@@ -308,7 +337,8 @@ def main():
             if not order_specs:
                 reason = "No valid strikes found passing Greek & Slippage Guard criteria."
                 print(f"⚠️ {reason}")
-                log_rejection(reason, current_spot, current_regime)
+                liquidity_context = get_market_liquidity_context(chain)
+                log_rejection(reason, current_spot, current_regime, context=liquidity_context)
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
@@ -344,7 +374,7 @@ def main():
             if net_credit < config.MIN_NET_CREDIT:
                 reason = f"Fee-Aware Exit Triggered. Net Credit ${net_credit:.2f} is < ${config.MIN_NET_CREDIT}. Trade rejected."
                 print(f"🛑 ALARM: {reason}")
-                log_rejection(reason, current_spot, current_regime)
+                log_rejection(reason, current_spot, current_regime, context={"net_credit": net_credit, "min_required": config.MIN_NET_CREDIT})
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue

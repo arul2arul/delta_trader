@@ -63,13 +63,14 @@ def select_best_strike(
         if opt_delta > max_delta:
             continue
             
-        # 3. Liquidity Filter (Slippage Guard)
-        bid = float(opt.get("best_bid", 0))
-        ask = float(opt.get("best_ask", 0))
-        mark = float(opt.get("mark_price", 0))
-        if mark > 0 and (ask - bid) / mark > 0.02:
-            # Spread > 2% of mark price
-            continue
+        if mark > 0:
+            spread_pct = (ask - bid) / mark
+            if spread_pct > 0.02:
+                logger.warning(
+                    f"Strike {strike_price} rejected: Spread is too wide "
+                    f"({spread_pct:.2%} > 2.0%) | Bid: {bid}, Ask: {ask}, Mark: {mark}"
+                )
+                continue
 
         candidates.append(opt)
 
