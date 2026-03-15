@@ -185,6 +185,15 @@ def main():
         wide_wings = check_volatility(iv_rank)
         print(f"⚡ IV Rank: {iv_rank:.1f}% (Wide Wings: {wide_wings})")
         
+        # IV Rank Floor Filter for Iron Condors (Vega Risk Protection)
+        if suggested_strategy == config.StrategyType.IRON_CONDOR and iv_rank < config.IV_ENTRY_MIN:
+            reason = f"IV Rank ({iv_rank:.1f}%) is below minimum threshold ({config.IV_ENTRY_MIN}%). Risk of IV expansion is too high for Iron Condor."
+            print(f"🛑 Safe Entry Filter: {reason} Skipping.")
+            log_rejection(reason, current_spot, current_regime)
+            print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+            time.sleep(POLL_INTERVAL_SEC)
+            continue
+        
         # --- Pre-Entry Logic Check ---
         is_supertrend_red = df_15m.iloc[-1].get("supertrend_dir", 1) < 0
         

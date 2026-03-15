@@ -57,6 +57,7 @@ CANDLE_TIMEFRAME = "1h"     # Hourly candles
 # Implied Volatility
 # ──────────────────────────────────────────────
 IV_RANK_THRESHOLD = 70      # Widen wings if IV Rank > 70%
+IV_ENTRY_MIN = 30           # Do not enter Iron Condor if IV Rank < 30% (protect against IV expansion)
 
 # ──────────────────────────────────────────────
 # Scheduling (IST)
