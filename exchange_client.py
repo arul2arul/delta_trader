@@ -288,9 +288,18 @@ class ExchangeClient:
                     stop_price: float = 0):
         """Place a single order using the SDK's native methods."""
         def _place():
-            if stop_price > 0:
-                # Use SDK's place_stop_order for stop orders
-                # If no limit_price provided for a stop, set it equal to stop_price to act as a Stop-Limit
+            if order_type == "market_stop" and stop_price > 0:
+                # True Market Stop (Market order triggered by a stop price)
+                order = {
+                    "product_id": product_id,
+                    "size": size,
+                    "side": side,
+                    "order_type": "market_stop",
+                    "stop_price": str(stop_price),
+                }
+                return self._delta_client.create_order(order)
+            elif stop_price > 0:
+                # Stop-Limit order
                 final_limit = limit_price if limit_price > 0 else stop_price
                 return self._delta_client.place_stop_order(
                     product_id=product_id,
@@ -307,7 +316,7 @@ class ExchangeClient:
                     limit_price=str(limit_price),
                 )
             else:
-                # Market order via create_order
+                # Market order
                 order = {
                     "product_id": product_id,
                     "size": size,

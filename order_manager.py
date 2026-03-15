@@ -164,7 +164,7 @@ class OrderManager:
                 product_id=product_id,
                 size=size,
                 side=side,
-                order_type="market_order",
+                order_type="market_stop",
                 stop_price=float(stop_price),
             )
             logger.info(
