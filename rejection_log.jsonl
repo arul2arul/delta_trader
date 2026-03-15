@@ -30,6 +30,6 @@
 {"timestamp": "2026-03-14 13:24:48", "spot_price": 70550.03, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.23 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:29:52", "spot_price": 70559.88, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.25 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:34:55", "spot_price": 70580.18, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
-{"timestamp": "2026-03-14 13:39:57", "spot_price": 70615.55, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-14 13:39:57", "spot_price": 70615.55, "regime": "bearish", "reason": "Fee-Aware Credit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:44:59", "spot_price": 70673.51, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.74 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:49:59", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}

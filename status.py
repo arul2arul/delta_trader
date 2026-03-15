@@ -248,12 +248,21 @@ def main():
                     print_row("Active Positions", len(active))
                     total_pnl = 0
                     for pos in active:
-                        symbol = pos.get("symbol", "?")
+                        pid = int(pos.get("product_id", 0))
+                        # Use ticker/cache or just fetch if needed
+                        symbol = pos.get("symbol")
+                        if not symbol:
+                            try:
+                                prod = ec.get_product(pid)
+                                symbol = prod.get("symbol", f"PID:{pid}")
+                            except:
+                                symbol = f"PID:{pid}"
+                                
                         size = int(pos.get("size", 0))
                         side = "LONG" if size > 0 else "SHORT"
                         pnl = float(pos.get("unrealized_pnl", 0))
                         total_pnl += pnl
-                        print(f"      {side:>5} {abs(size)}x {symbol}  PnL={pnl:,.2f}")
+                        print(f"      {side:>5} {abs(size):<3}x {symbol:<22} PnL={pnl:,.2f}")
                     print_row("Total Unrealized PnL", f"{total_pnl:,.2f}")
                 else:
                     print_row("Positions", "None (flat)")

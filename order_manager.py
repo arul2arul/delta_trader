@@ -81,66 +81,56 @@ class OrderManager:
         order_specs: list[OrderSpec],
     ) -> list:
         """
-        Place orders using Delta API batch_create (max 5 per batch).
-        Splits into multiple batches if needed.
+        Place each leg as an individual market order to guarantee full,
+        instant fill on both legs simultaneously.
+
+        Note: Delta Exchange batch API forces limit_order type which causes
+        partial fills. We use individual market orders to avoid unbalanced
+        positions (e.g. long 20 / short 3).
         """
         if not order_specs:
             logger.warning("No orders to place")
             return []
 
-        # Convert OrderSpec to API format
-        api_orders = []
-        for spec in order_specs:
-            order = {
-                "product_id": spec.product_id,
-                "size": spec.size,
-                "side": spec.side,
-                # Batch orders strictly require limit_order per Delta Exchange schema
-                "order_type": "limit_order",
-            }
-            # Delta API requires limit_price as string
-            if getattr(spec, "limit_price", 0) > 0:
-                order["limit_price"] = str(spec.limit_price)
-            api_orders.append(order)
-
-        # Split into batches of max 5
         results = []
-        for i in range(0, len(api_orders), config.BATCH_ORDER_MAX):
-            batch = api_orders[i : i + config.BATCH_ORDER_MAX]
-            batch_num = (i // config.BATCH_ORDER_MAX) + 1
-
+        for i, spec in enumerate(order_specs):
+            leg_num = i + 1
             try:
                 logger.info(
-                    f"Placing batch {batch_num} "
-                    f"({len(batch)} orders)..."
+                    f"Placing Leg {leg_num}/{len(order_specs)}: "
+                    f"{spec.side.upper()} {spec.size}x product={spec.product_id} "
+                    f"@ MARKET"
                 )
-                result = self.client.batch_create_orders(batch)
+                result = self.client.place_order(
+                    product_id=spec.product_id,
+                    size=spec.size,
+                    side=spec.side,
+                    order_type="market_order",
+                )
                 results.append(result)
 
-                # Log each order
-                for j, spec in enumerate(order_specs[i : i + config.BATCH_ORDER_MAX]):
-                    self.trade_logger.log_trade(
-                        action="OPEN",
-                        product_id=spec.product_id,
-                        strike=spec.strike_price,
-                        option_type=spec.option_type,
-                        side=spec.side,
-                        quantity=spec.size,
-                        price=spec.limit_price,
-                        notes=f"Batch {batch_num}, role={spec.role}",
-                    )
-
-                logger.info(f"✅ Batch {batch_num} placed successfully")
+                self.trade_logger.log_trade(
+                    action="OPEN",
+                    product_id=spec.product_id,
+                    strike=spec.strike_price,
+                    option_type=spec.option_type,
+                    side=spec.side,
+                    quantity=spec.size,
+                    price=spec.limit_price,
+                    notes=f"Market order, leg {leg_num}, role={spec.role}",
+                )
+                logger.info(f"✅ Leg {leg_num} market order placed successfully")
 
             except Exception as e:
-                logger.error(f"❌ Batch {batch_num} failed: {e}")
+                logger.error(f"❌ Leg {leg_num} failed: {e}")
                 self.trade_logger.log_event(
                     action="ERROR",
-                    notes=f"Batch order failed: {e}",
+                    notes=f"Leg {leg_num} order failed: {e}",
                 )
                 raise
 
         return results
+
 
     def place_hard_stop_loss(
         self,

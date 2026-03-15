@@ -1,0 +1,279 @@
+[13-03-2026 11:55:02.02] Starting Delta Trader Automation 
+🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...
+
+💤 Window not open yet. Waiting 5m... (Opens 12:00 IST)
+
+==================================================
+🔄 [12:00:25 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,233.05
+📊 Market Regimen: BULLISH
+   RSI: 60.5 | ADX: 20.0 | ATR: 568.6 | VWAP: 71340.7
+2026-03-13 12:00:35,344 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $430.00 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:05:38 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,237.69
+📊 Market Regimen: BULLISH
+   RSI: 58.6 | ADX: 19.9 | ATR: 577.8 | VWAP: 71336.6
+2026-03-13 12:05:47,291 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $439.50 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:10:51 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,307.65
+📊 Market Regimen: BULLISH
+   RSI: 58.8 | ADX: 19.8 | ATR: 580.0 | VWAP: 71336.1
+2026-03-13 12:10:59,328 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $461.00 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:16:02 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,191.37
+📊 Market Regimen: BULLISH
+   RSI: 58.5 | ADX: 19.8 | ATR: 580.0 | VWAP: 71335.3
+2026-03-13 12:16:13,246 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $461.00 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:21:18 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,258.41
+📊 Market Regimen: BULLISH
+   RSI: 58.4 | ADX: 19.8 | ATR: 580.0 | VWAP: 71334.8
+2026-03-13 12:21:26,919 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $415.00 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:26:30 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,334.62
+📊 Market Regimen: BULLISH
+   RSI: 59.9 | ADX: 19.8 | ATR: 580.0 | VWAP: 71338.8
+2026-03-13 12:26:38,576 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+🛑 Safe Entry Filter: 60m Consolidation range is $415.00 (>= $400). Skipping.
+💤 Waiting 5m before next check...
+
+==================================================
+🔄 [12:31:41 IST] Checking Market Conditions
+==================================================
+💰 Spot Price: $71,210.06
+📊 Market Regimen: BULLISH
+   RSI: 59.6 | ADX: 19.8 | ATR: 580.0 | VWAP: 71338.1
+2026-03-13 12:31:50,859 - WARNING - ⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.
+⚡ IV Rank: 50.0% (Wide Wings: False)
+
+⚙️  Building orders for: Iron Condor (20 Lots)
+
+==================================================
+🤖 OPENCLAW RECOMMENDATION: BULL_CREDIT_SPREAD
+==================================================
+  [Short] SELL PUT @ 70,000 | Premium: $11.4239 | Product: 123181
+  [Long ] BUY PUT @ 69,600 | Premium: $2.9334 | Product: 126203
+
+💵 Est. Net Credit: $8.4905
+
+🤖 Consulting AI Model (Gemini) for Second Opinion...
+🧠 AI Assessment:
+Despite the bullish market regime and positive trend momentum aligning favorably with a bull put spread, the 0-DTE nature significantly amplifies gamma risk from potential rapid downward reversals. Conservative strike selection and robust stop-loss management are paramount to mitigate this inherent, amplified downside exposure.
+
+CONFIDENCE: 8/10
+✅ AI Validation Passed (Confidence 8/10). Proceeding to execution payload.
+
+💥 INITIALIZING LIVE EXECUTION 💥
+
+🔒 Trade lock file written (.trade_lock). Will be cleared on success.
+🚀 Routing Multi-Leg Order to Delta Exchange...
+🛡️ Placing Exchange-Side Stop Loss & Take Profit Guards...
+
+✅ Execution Fully Successful!
+🔓 Trade lock released.
+
+--- OPENCLAW JSON PAYLOAD (SUCCESSFULLY EXECUTED) ---
+{
+  "strategy": "bull_credit_spread",
+  "underlying": 71210.06043835,
+  "net_credit": 8.49049836,
+  "orders": [
+    {
+      "product_id": 123181,
+      "side": "sell",
+      "size": 20,
+      "order_type": "limit_order",
+      "limit_price": 11.42390047,
+      "stop_loss_price": 28.56,
+      "take_profit_price": 1.14
+    },
+    {
+      "product_id": 126203,
+      "side": "buy",
+      "size": 20,
+      "order_type": "market_order",
+      "limit_price": 2.93340211
+    }
+  ],
+  "execution_status": "SUCCESS - POSITIONS OPENED",
+  "ai_assessment": "Despite the bullish market regime and positive trend momentum aligning favorably with a bull put spread, the 0-DTE nature significantly amplifies gamma risk from potential rapid downward reversals. Conservative strike selection and robust stop-loss management are paramount to mitigate this inherent, amplified downside exposure.\n\nCONFIDENCE: 8/10"
+}
+-----------------------------------------------------
+2026-03-13 12:32:19,182 - INFO - Generated Payload: {
+  "strategy": "bull_credit_spread",
+  "underlying": 71210.06043835,
+  "net_credit": 8.49049836,
+  "orders": [
+    {
+      "product_id": 123181,
+      "side": "sell",
+      "size": 20,
+      "order_type": "limit_order",
+      "limit_price": 11.42390047,
+      "stop_loss_price": 28.56,
+      "take_profit_price": 1.14
+    },
+    {
+      "product_id": 126203,
+      "side": "buy",
+      "size": 20,
+      "order_type": "market_order",
+      "limit_price": 2.93340211
+    }
+  ],
+  "execution_status": "SUCCESS - POSITIONS OPENED",
+  "ai_assessment": "Despite the bullish market regime and positive trend momentum aligning favorably with a bull put spread, the 0-DTE nature significantly amplifies gamma risk from potential rapid downward reversals. Conservative strike selection and robust stop-loss management are paramount to mitigate this inherent, amplified downside exposure.\n\nCONFIDENCE: 8/10"
+}
+2026-03-13 12:32:19,186 - INFO - Saved 'daily_trade_context.json' for EOD verification.
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\aruls\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 36-37: character maps to <undefined>
+Call stack:
+  File "C:\code\delta_trader\analyze_0dte.py", line 494, in <module>
+    main()
+  File "C:\code\delta_trader\analyze_0dte.py", line 172, in main
+    suggested_strategy = get_strategy_for_regime(regime)
+  File "C:\code\delta_trader\regime_detector.py", line 124, in get_strategy_for_regime
+    logger.warning("⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.")
+Message: '⚠️ Extreme Fear detected. Bull Put Spreads are too risky due to rapid downside velocity. Downgrading to Iron Condor.'
+Arguments: ()
+[13-03-2026 12:32:20.66] Script Finished 

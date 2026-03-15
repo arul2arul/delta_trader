@@ -1,31 +1,31 @@
 {
-    "date": "2026-03-12",
-    "entry_time": "12:18:12",
-    "spot_price": 69418.62973526,
-    "regime": "bearish",
-    "atr_at_entry": 521.4778694588368,
-    "atr_3d_avg": 668.5990798863176,
-    "trend_4h_movement": 194.0,
-    "consolidation_range_60m": 206.5,
-    "suggested_strategy": "bear_credit_spread",
-    "net_credit_expected": 111.21048880999999,
-    "funding_rate": 0,
+    "date": "2026-03-13",
+    "entry_time": "13:20:14",
+    "spot_price": 71586.51324503,
+    "regime": "bullish",
+    "atr_at_entry": 563.6956198110402,
+    "atr_3d_avg": 641.4412227298097,
+    "trend_4h_movement": 165.0,
+    "consolidation_range_60m": 352.0,
+    "suggested_strategy": "bull_credit_spread",
+    "net_credit_expected": 3.4912757999999995,
+    "funding_rate": 0.010000000000000002,
     "recommended_orders": [
         {
-            "product_id": 126226,
+            "product_id": 124032,
             "side": "sell",
-            "size": 10,
+            "size": 20,
             "order_type": "limit_order",
-            "limit_price": 140.38636318,
-            "stop_loss_price": 350.97,
-            "take_profit_price": 14.04
+            "limit_price": 7.32510839,
+            "stop_loss_price": 18.31,
+            "take_profit_price": 0.73
         },
         {
-            "product_id": 125328,
+            "product_id": 123181,
             "side": "buy",
-            "size": 10,
+            "size": 20,
             "order_type": "market_order",
-            "limit_price": 29.17587437
+            "limit_price": 3.83383259
         }
     ]
 }
