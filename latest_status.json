@@ -1,7 +1,7 @@
 {
-    "timestamp": "2026-03-14 13:49:59",
-    "spot_price": 0.0,
-    "regime": "UNKNOWN",
-    "reason": "Cutoff time reached (13:45 IST). Skipping Day.",
+    "timestamp": "2026-03-15 14:57:48",
+    "spot_price": 71824.1,
+    "regime": "bullish",
+    "reason": "60m Consolidation range is $442.00 (>= $400).",
     "status": "NO_TRADE"
 }

@@ -5,20 +5,30 @@ All notable changes to the AI Trading Bot project will be documented in this fil
 ## [Unreleased] - 2026-03-15
 
 ### Added
-- **State Recovery System**: Both `main.py` and `analyze_0dte.py` now scan Delta Exchange for open positions at startup. If a trade is found (e.g., after a crash or lid closure), the bot resumes monitoring immediately instead of starting fresh.
-- **Detailed Rejection Context**: Added `get_market_liquidity_context` to log median spreads, quote counts, and max/min spreads when a trade is rejected due to slippage guards.
-- **Sleep Prevention**: Integrated `wakepy` to prevent the laptop from entering power-saving modes or sleeping while the bot is active.
-- **Market Stop Support**: Added `market_stop` order type support in `ExchangeClient` and `OrderManager` for guaranteed fills on protective orders.
+
+- **Post-Trade Analysis System**: Implemented `PostTradeAnalyzer` to perform forensic audits on trade exits, including root-cause analysis for stop-losses (Wicks, Trend Breaks, IV Spikes).
+- **SQLite Trade Memory**: Introduced a dedicated SQLite database (`openclaw_vault.db`) for persistent "Trade Memory," tracking every basket leg and AI critique through restarts.
+- **AI Feedback Loop**: Integrated a 7-day running win-rate into the AI pre-flight prompt, allowing the model to adjust risk based on recent bot performance.
+- **Strategy Suspension Fail-Safe**: Automatic "Kill-Switch" that halts trading and alerts via Telegram after 3 consecutive stop-loss hits for manual strategy review.
+- **Historical Performance Reports**: Telegram heartbeats now include a performance snapshot of the last 5 trades to provide EOD context at a glance.
 
 ### Changed
-- **Stop Loss Mechanism**: Upgraded Stop-Loss orders from `Stop-Limit` to `Market Stop`. This ensures positions are closed even if the price gaps through the trigger strike during high volatility.
-- **Network Resilience**: Wrapped the main trading loop in `analyze_0dte.py` in a `try-except` block to gracefully handle `ConnectionError` and `TimeoutError` by retrying after 10 seconds.
-- **Logging Infrastructure**: Switched `brain_execution.log` to use `RotatingFileHandler` (10MB limit, 5 backups) to prevent disk space exhaustion.
-- **Clock Synchronization**: Replaced generic NTP sync with Delta-specific server time sync to eliminate "Delta Drift" and signature mismatch errors.
-- **AI Validation Logic**: Enhanced the Gemini prompt to specifically analyze Order Book Imbalance (`ob_imbalance`), Funding Rates, and look for "Squeeze" or "Stop Loss Cluster" setups.
-- **Polling Intervals**: Increased `PNL_POLL_IRON_CONDOR` to 120s and `PNL_POLL_CREDIT_SPREAD` to 60s to accommodate network latency from local machines.
+
+- **Atomic Order Logging**: Every trade is now written to SQLite as `PENDING` before the API call is fired, ensuring no trade is "lost" due to network or script failure.
+- **Multi-Layer State Recovery**: Enhanced startup logic to cross-reference live exchange positions with persistent DB state for guaranteed re-attachment to orphan trades.
+- **Telegram Reliability**: Sanitized strategy and metadata strings in Telegram alerts to prevent Markdown formatting errors (re-formatting underscores).
 
 ### Fixed
-- Fixed an issue where the bot would lose track of open trades if the terminal session hung or the script was restarted.
-- Fixed a potential "no-fill" risk on Stop Losses during sharp market moves by moving to Market Stops.
-- Improved error reporting via Telegram for fatal crashes on local machines.
+
+- **NameError in Strike Selection**: Resolved bug in `strike_selector.py` where Greek variables were referenced before their retrieval from the chain.
+- **State Recovery Crash**: Fixed `active_positions` NameError that occurred during the startup sequence after the SQLite refactor.
+- **Clock Drift Detection**: Improved reliability of pre-flight timestamp validation against Delta Exchange servers.
+
+## [Previous] - 2026-03-15 (Batch 1)
+
+### Previous Added
+
+- **State Recovery System**: Both `main.py` and `analyze_0dte.py` now scan Delta Exchange for open positions at startup.
+- **Detailed Rejection Context**: Added `get_market_liquidity_context` to log median spreads.
+- **Sleep Prevention**: Integrated `wakepy` for local server stability.
+- **Market Stop Support**: Added `market_stop` order type for guaranteed SL fills.

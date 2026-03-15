@@ -15,9 +15,10 @@ logger = logging.getLogger("order_manager")
 class OrderManager:
     """Handles all order-related operations."""
 
-    def __init__(self, exchange_client, trade_logger):
+    def __init__(self, exchange_client, trade_logger, db_manager=None):
         self.client = exchange_client
         self.trade_logger = trade_logger
+        self.db = db_manager
 
     def validate_margin(
         self,
@@ -79,27 +80,39 @@ class OrderManager:
     def place_batch_orders(
         self,
         order_specs: list[OrderSpec],
+        trade_context: dict = None,
     ) -> list:
         """
         Place each leg as an individual market order to guarantee full,
         instant fill on both legs simultaneously.
-
-        Note: Delta Exchange batch API forces limit_order type which causes
-        partial fills. We use individual market orders to avoid unbalanced
-        positions (e.g. long 20 / short 3).
         """
         if not order_specs:
             logger.warning("No orders to place")
             return []
 
+        # 1. Atomic DB Entry (PENDING)
+        trade_id = None
+        if self.db and trade_context:
+            try:
+                # Extract meta-data for the Trades table
+                strategy = trade_context.get("suggested_strategy", "UNKNOWN")
+                total_lots = trade_context.get("final_lots", 0)
+                entry_spot = trade_context.get("spot_price", 0)
+                net_premium = trade_context.get("net_credit_expected", 0)
+                
+                trade_id = self.db.create_trade(strategy, total_lots, entry_spot, net_premium)
+                logger.info(f"📁 Trade record created in SQLite (PENDING) | ID: {trade_id}")
+            except Exception as e:
+                logger.error(f"Failed to create DB record: {e}")
+
         results = []
+        success = False
         for i, spec in enumerate(order_specs):
             leg_num = i + 1
             try:
                 logger.info(
                     f"Placing Leg {leg_num}/{len(order_specs)}: "
-                    f"{spec.side.upper()} {spec.size}x product={spec.product_id} "
-                    f"@ MARKET"
+                    f"{spec.side.upper()} {spec.size}x product={spec.product_id} @ MARKET"
                 )
                 result = self.client.place_order(
                     product_id=spec.product_id,
@@ -108,7 +121,9 @@ class OrderManager:
                     order_type="market_order",
                 )
                 results.append(result)
+                success = True
 
+                # Log each order to trade_logger and DB
                 self.trade_logger.log_trade(
                     action="OPEN",
                     product_id=spec.product_id,
@@ -119,6 +134,17 @@ class OrderManager:
                     price=spec.limit_price,
                     notes=f"Market order, leg {leg_num}, role={spec.role}",
                 )
+                
+                # SQLite Leg Logging
+                if self.db and trade_id:
+                    self.db.add_leg(
+                        trade_id=trade_id,
+                        product_id=spec.product_id,
+                        strike=spec.strike_price,
+                        side=spec.side,
+                        fill_price=spec.limit_price
+                    )
+                
                 logger.info(f"✅ Leg {leg_num} market order placed successfully")
 
             except Exception as e:
@@ -128,6 +154,11 @@ class OrderManager:
                     notes=f"Leg {leg_num} order failed: {e}",
                 )
                 raise
+
+        # 2. Update status to OPEN
+        if self.db and trade_id and success:
+            self.db.update_trade_status(trade_id, "OPEN")
+            logger.info(f"📁 Trade status promoted to OPEN in SQLite | ID: {trade_id}")
 
         return results
 

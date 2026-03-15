@@ -57,6 +57,7 @@ def ask_ai_for_second_opinion(trade_context: dict) -> dict:
 - Funding Rate: {funding_rate}
 - OB Imbalance: {ob_imbalance:.2f}
 - Hours to Expiry: {hours_to_exp:.2f}
+- 7-Day Bot Win Rate: {trade_context.get('win_rate_7d', 0):.1f}%
 
 [L2 ORDER BOOK DEPTH (Top 5)]
 - Bids: {ob_depth.get('bids', [])}
@@ -146,3 +147,46 @@ Where X is 1-10. Score below 6 = is_safe: false.
                     f"AI check skipped. Trade approved purely on quantitative math criteria."
                 )
             }
+    except Exception as e:
+        return f"AI Feedback unavailable: {str(e)}"
+
+
+def get_ai_retrospective(trade_summary: dict) -> str:
+    """
+    Asks Gemini to analyze a completed trade and provide a learning note.
+    """
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not AI_AVAILABLE or not api_key:
+        return "AI Retrospective skipped: API not configured."
+
+    try:
+        client = genai.Client(api_key=api_key)
+
+        prompt = f"""[ROLE] You are a Senior Quantitative Options Trader.
+[TASK] Review this completed 0DTE trade and provide a 1-sentence "Retrospective Note" for the log.
+Explain WHY the outcome likely happened and what to check next time.
+
+[TRADE DATA]
+- Strategy: {trade_summary.get('strategy')}
+- Entry Spot: {trade_summary.get('entry_spot')}
+- Exit Spot: {trade_summary.get('exit_spot')}
+- Realized PnL: {trade_summary.get('realized_pnl')}
+- Exit Reason: {trade_summary.get('exit_reason')}
+- Identified Cause: {trade_summary.get('sl_cause')}
+- Regime at Entry: {trade_summary.get('regime')}
+- 1H ATR at Entry: {trade_summary.get('atr')}
+
+[FORMAT]
+Respond with ONLY the 1-sentence note. Be dry, professional, and analytical.
+"""
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", # Use faster model for retrospectives
+            contents=prompt,
+        )
+        return response.text.strip()
+
+    except Exception as e:
+        logger.warning(f"AI Retrospective failed: {e}")
+        return f"Could not generate AI note: {str(e)}"

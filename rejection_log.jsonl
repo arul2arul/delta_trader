@@ -33,3 +33,82 @@
 {"timestamp": "2026-03-14 13:39:57", "spot_price": 70615.55, "regime": "bearish", "reason": "Fee-Aware Credit Triggered. Net Credit $0.92 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:44:59", "spot_price": 70673.51, "regime": "bearish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.74 is < $3.0. Trade rejected.", "status": "NO_TRADE"}
 {"timestamp": "2026-03-14 13:49:59", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:28:31", "spot_price": 71410.79, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:30:49", "spot_price": 71407.42, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:31:45", "spot_price": 71409.92, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:33:34", "spot_price": 71405.27, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:33:36", "spot_price": 71405.27, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:35:01", "spot_price": 71430.3, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.47 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.46810801, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:35:53", "spot_price": 71433.56, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:36:48", "spot_price": 71443.04, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:38:38", "spot_price": 71444.32, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:38:39", "spot_price": 71444.32, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:40:07", "spot_price": 71418.67, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.29 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.28518137, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:40:56", "spot_price": 71445.31, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:41:55", "spot_price": 71567.15, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:43:42", "spot_price": 71614.43, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:43:45", "spot_price": 71612.02, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:45:23", "spot_price": 71584.71, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:46:00", "spot_price": 71614.0, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:47:00", "spot_price": 71589.1, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:48:04", "spot_price": 71605.32, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:48:45", "spot_price": 71626.23, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:48:47", "spot_price": 71626.89, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:50:27", "spot_price": 71594.19, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $2.17 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 2.17113877, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:51:03", "spot_price": 71575.65, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:52:03", "spot_price": 71582.18, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:53:07", "spot_price": 71567.57, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.78 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.77597419, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:53:49", "spot_price": 71577.93, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:53:50", "spot_price": 71577.93, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:55:31", "spot_price": 71566.39, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.46 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.4560215199999997, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:56:06", "spot_price": 71574.92, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:57:07", "spot_price": 71563.24, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:58:11", "spot_price": 71554.22, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.94 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 0.9383711999999997, "min_required": 3.0}}
+{"timestamp": "2026-03-15 12:58:52", "spot_price": 71548.18, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 12:58:54", "spot_price": 71547.94, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:00:35", "spot_price": 71522.28, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.01 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.0148686399999995, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:01:11", "spot_price": 71477.7, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:02:13", "spot_price": 71504.78, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:03:17", "spot_price": 71499.71, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $2.17 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 2.1683015199999995, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:03:55", "spot_price": 71491.73, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:03:57", "spot_price": 71491.73, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:05:39", "spot_price": 71494.64, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $2.16 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 2.1584715599999997, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:06:14", "spot_price": 71471.75, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:07:16", "spot_price": 71464.85, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:08:20", "spot_price": 71462.08, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $2.19 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 2.19177307, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:09:00", "spot_price": 71455.36, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:09:00", "spot_price": 71455.36, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:10:42", "spot_price": 71456.96, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.90 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.90046991, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:11:17", "spot_price": 71451.29, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:12:20", "spot_price": 71434.81, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:28:27", "spot_price": 71425.36, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $1.09 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 1.0875712600000003, "min_required": 3.0}}
+{"timestamp": "2026-03-15 13:29:03", "spot_price": 71408.0, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 13:29:04", "spot_price": 71408.0, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:05:50", "spot_price": 71473.99, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.86 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 0.8575518699999998, "min_required": 3.0}}
+{"timestamp": "2026-03-15 14:06:08", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:20:31", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:21:54", "spot_price": 71575.62, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $0.20 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 0.19901553000000005, "min_required": 3.0}}
+{"timestamp": "2026-03-15 14:22:16", "spot_price": 0.0, "regime": "UNKNOWN", "reason": "Cutoff time reached (13:45 IST). Skipping Day.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:22:29", "spot_price": 71587.52, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:24:24", "spot_price": 71563.97, "regime": "bullish", "reason": "Fee-Aware Exit Triggered. Net Credit $2.04 is < $3.0. Trade rejected.", "status": "NO_TRADE", "context": {"net_credit": 2.0406759, "min_required": 3.0}}
+{"timestamp": "2026-03-15 14:27:06", "spot_price": 71603.2, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:27:33", "spot_price": 71605.03, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:29:38", "spot_price": 71640.94, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:32:19", "spot_price": 71805.32, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:32:36", "spot_price": 71790.16, "regime": "bullish", "reason": "Error during dry-run lot calculation: name 'mark' is not defined", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:34:51", "spot_price": 71819.54, "regime": "bullish", "reason": "AI Validation Failed (Confidence 1/10). The mathematical setup looks poor to the AI.", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:37:22", "spot_price": 71818.06, "regime": "bullish", "reason": "60m Consolidation range is $401.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:37:38", "spot_price": 71814.27, "regime": "bullish", "reason": "60m Consolidation range is $401.50 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:39:53", "spot_price": 71862.9, "regime": "bullish", "reason": "60m Consolidation range is $415.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:42:24", "spot_price": 71818.84, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:42:41", "spot_price": 71804.97, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:44:55", "spot_price": 71782.08, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:47:27", "spot_price": 71833.3, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:47:43", "spot_price": 71845.15, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:50:00", "spot_price": 71838.03, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:50:11", "spot_price": 71829.27, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:52:29", "spot_price": 71787.63, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:52:45", "spot_price": 71838.23, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:55:03", "spot_price": 71892.58, "regime": "bullish", "reason": "60m Consolidation range is $422.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:57:32", "spot_price": 71826.66, "regime": "bullish", "reason": "60m Consolidation range is $442.00 (>= $400).", "status": "NO_TRADE"}
+{"timestamp": "2026-03-15 14:57:48", "spot_price": 71824.1, "regime": "bullish", "reason": "60m Consolidation range is $442.00 (>= $400).", "status": "NO_TRADE"}

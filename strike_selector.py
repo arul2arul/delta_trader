@@ -63,6 +63,10 @@ def select_best_strike(
         if opt_delta > max_delta:
             continue
             
+        bid = float(opt.get("best_bid", 0))
+        ask = float(opt.get("best_ask", 0))
+        mark = float(opt.get("mark_price", 0))
+
         if mark > 0:
             spread_pct = (ask - bid) / mark
             if spread_pct > 0.02:

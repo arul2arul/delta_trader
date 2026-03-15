@@ -114,9 +114,6 @@ class Notifier:
             f"Rolling/closing immediately!"
         )
 
-    # ──────────────────────────────────────────
-    # Heartbeat (Hourly)
-    # ──────────────────────────────────────────
     def send_heartbeat(
         self,
         pnl: float = 0,
@@ -129,16 +126,33 @@ class Notifier:
         Shows current PnL, open positions, active strategy.
         """
         now = datetime.now(self.ist).strftime("%Y-%m-%d %H:%M IST")
+        self.last_check = last_check or now
+        
         heartbeat = (
             f"💓 *Heartbeat* [{now}]\n"
             f"Status: ✅ Running\n"
             f"PnL: ₹{pnl:,.2f}\n"
             f"Open Positions: {positions}\n"
-            f"Active Strategy: {strategy}\n"
-            f"Last Check: {last_check or now}"
+            f"Active Strategy: {strategy.replace('_', ' ')}\n"
+            f"Last Check: {self.last_check}"
         )
         self._send_message(heartbeat)
         logger.info("Heartbeat sent")
+
+    def send_performance_report(self, trades: list):
+        """Sends a summary of recent trade performance."""
+        if not trades:
+            return
+            
+        report = "📊 *Recent Performance (Last 5)*\n"
+        for t in trades:
+            status_emoji = "✅" if t['final_pnl_inr'] > 0 else "❌"
+            date_str = t['timestamp'].split(' ')[0]
+            # Telegram markdown fix: underscores in strategy names break formatting
+            strat_clean = t['strategy'].replace("_", " ")
+            report += f"{status_emoji} {date_str} | {strat_clean} | PnL: ₹{t['final_pnl_inr']:,.0f}\n"
+            
+        self._send_message(report)
 
     def start_heartbeat(
         self,

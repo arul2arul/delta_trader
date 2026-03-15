@@ -283,6 +283,15 @@ class ExchangeClient:
     # ──────────────────────────────────────────
     # Orders
     # ──────────────────────────────────────────
+    def round_to_tick(self, price: float, tick_size: float = 0.05) -> str:
+        """Round price to the nearest tick size and return as string."""
+        if price <= 0:
+            return "0.0"
+        rounded = round(price / tick_size) * tick_size
+        # Format to 2 or 4 decimal places based on price magnitude
+        precision = 2 if price > 100 else 4
+        return f"{rounded:.{precision}f}"
+
     def place_order(self, product_id: int, size: int, side: str,
                     order_type: str = "market_order", limit_price: float = 0,
                     stop_price: float = 0):
@@ -295,7 +304,7 @@ class ExchangeClient:
                     "size": size,
                     "side": side,
                     "order_type": "market_stop",
-                    "stop_price": str(stop_price),
+                    "stop_price": self.round_to_tick(stop_price, 0.1),
                 }
                 return self._delta_client.create_order(order)
             elif stop_price > 0:
@@ -305,15 +314,15 @@ class ExchangeClient:
                     product_id=product_id,
                     size=size,
                     side=side,
-                    stop_price=str(stop_price),
-                    limit_price=str(final_limit),
+                    stop_price=self.round_to_tick(stop_price, 0.1),
+                    limit_price=self.round_to_tick(final_limit, 0.05),
                 )
             elif order_type == "limit_order" and limit_price > 0:
                 return self._delta_client.place_order(
                     product_id=product_id,
                     size=size,
                     side=side,
-                    limit_price=str(limit_price),
+                    limit_price=self.round_to_tick(limit_price, 0.05),
                 )
             else:
                 # Market order
@@ -328,9 +337,8 @@ class ExchangeClient:
 
     def batch_create_orders(self, orders: list):
         """
-        Place multiple orders in a single batch (max 5).
-        SDK signature: batch_create(product_id, orders)
-        All orders in a batch must be for the same product.
+        Place multiple orders across DIFFERENT products in a single atomic payload.
+        Satisfies the 'Basket Execution' requirement for Portfolio Margin.
         """
         def _batch():
             if not orders:

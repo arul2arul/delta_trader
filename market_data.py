@@ -288,6 +288,23 @@ class MarketData:
             logger.error(f"Failed to fetch funding rate: {e}")
             return 0.0
 
+    def get_top_5_orderbook_depth(self, symbol: str = "BTCUSD") -> dict:
+        """
+        Fetch top 5 levels of Bids and Asks for AI validation.
+        """
+        try:
+            data = self.client.get_l2_orderbook(symbol)
+            if not data:
+                return {"bids": [], "asks": []}
+            
+            return {
+                "bids": data.get("bids", [])[:5],
+                "asks": data.get("asks", [])[:5]
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch orderbook depth: {e}")
+            return {"bids": [], "asks": []}
+
     def get_orderbook_imbalance(self, symbol: str = "BTCUSD") -> float:
         """
         Calculate Order Book Imbalance (Net Buy/Sell pressure).

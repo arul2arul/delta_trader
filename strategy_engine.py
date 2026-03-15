@@ -67,6 +67,7 @@ def build_iron_condor(
             limit_price=strike.premium,
             strike_price=strike.strike_price,
             option_type=strike.option_type,
+            symbol=strike.symbol,
             role=role,
         )
         orders.append(order)
@@ -142,6 +143,7 @@ def build_credit_spread(
         limit_price=short_strike.premium,
         strike_price=short_strike.strike_price,
         option_type=short_strike.option_type,
+        symbol=short_strike.symbol,
         role="short_leg",
     ))
 
@@ -159,6 +161,7 @@ def build_credit_spread(
         limit_price=long_strike.premium,
         strike_price=long_strike.strike_price,
         option_type=long_strike.option_type,
+        symbol=long_strike.symbol,
         role="long_leg",
     ))
 

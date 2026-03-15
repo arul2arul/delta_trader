@@ -17,6 +17,13 @@ PRODUCTION_WS_URL = "wss://socket.india.delta.exchange"
 TESTNET_WS_URL = "wss://socket-ind.testnet.deltaex.org"
 
 # ──────────────────────────────────────────────
+# Database & Persistence (SQLite)
+# ──────────────────────────────────────────────
+import os
+DATA_DIR = os.path.join(os.getcwd(), "data")
+DB_PATH = os.path.join(DATA_DIR, "openclaw_vault.db")
+
+# ──────────────────────────────────────────────
 # Risk & Capital Preservation Rules
 # ──────────────────────────────────────────────
 TOTAL_CAPITAL_INR = 90_000   
@@ -176,4 +183,5 @@ class OrderSpec:
     stop_price: float = 0.0
     strike_price: float = 0.0
     option_type: str = ""
+    symbol: str = ""
     role: str = ""     # "short_call", "long_put", etc.

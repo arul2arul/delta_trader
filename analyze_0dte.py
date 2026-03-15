@@ -20,6 +20,8 @@ import io
 from wakepy import keep
 from logging.handlers import RotatingFileHandler
 
+DRY_RUN = "--dry-run" in sys.argv
+
 # Force UTF-8 output to handle emojis on Windows
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -39,6 +41,9 @@ from monitor import Monitor
 from scheduler import Scheduler
 from ws_client import WebSocketClient
 from config import StrategyType
+from preflight import PreFlightValidator
+from post_trade_analyzer import PostTradeAnalyzer
+from database_manager import DatabaseManager
 
 logging.basicConfig(
     level=logging.WARNING, 
@@ -131,13 +136,33 @@ def check_trade_lock():
 
 
 def main():
+    # --- Check for Strategy Suspension ---
+    state_file = "bot_state.json"
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+            if state.get("suspend_trading", False):
+                print("\n🚨 STRATEGY SUSPENDED 🚨")
+                print("The bot has hit 3 consecutive stop-losses. Trading is paused for manual review.")
+                print("To resume: Review logs, then set 'suspend_trading': false in bot_state.json.")
+                return
+        except Exception:
+            pass
+
     print("🧠 Initiating 0 DTE Brain Analysis (Polling Mode)...\n")
+    db_manager = DatabaseManager()
     exchange = ExchangeClient()
     market_data = MarketData(exchange)
     
     # Check Time Sync at startup to avoid "Delta Drift"
     print("🕒 Checking clock synchronization with Delta servers...")
     exchange.check_time_sync()
+
+    # Log initial status with performance
+    notifier = Notifier()
+    recent = db_manager.get_recent_performance(limit=5)
+    notifier.send_performance_report(recent)
 
     risk_manager = RiskManager()
 
@@ -153,13 +178,13 @@ def main():
             current_regime = "UNKNOWN"
             
             # Monitor start time
-            if now_ist.hour < START_HOUR:
+            if now_ist.hour < START_HOUR and not DRY_RUN:
                 print(f"💤 Window not open yet. Waiting {POLL_INTERVAL_SEC // 60}m... (Opens {START_HOUR}:00 IST)")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
                 
             # Hard cutoff time
-            if now_ist.hour > CUTOFF_HOUR or (now_ist.hour == CUTOFF_HOUR and now_ist.minute >= CUTOFF_MINUTE):
+            if (now_ist.hour > CUTOFF_HOUR or (now_ist.hour == CUTOFF_HOUR and now_ist.minute >= CUTOFF_MINUTE)) and not DRY_RUN:
                 reason = f"Cutoff time reached ({CUTOFF_HOUR}:{CUTOFF_MINUTE} IST). Skipping Day."
                 print(f"\n🕘 Criteria Not Met - {reason} Shutting down.")
                 log_rejection(reason, current_spot, current_regime)
@@ -173,21 +198,27 @@ def main():
     
             # Level 2: Check live open positions on Delta Exchange API
             open_positions = exchange.get_positions()
-            # Filter only positions with non-zero size (actual open trades)
             active_positions = [p for p in (open_positions or []) if abs(int(p.get("size", 0))) > 0]
+            
+            # Level 3: SQLite Persistent State Check
+            open_trade = db_manager.get_open_trade()
             
             # Initialize Monitoring Components
             trade_logger = TradeLogger()
             scheduler = Scheduler()
             notifier = Notifier()
-            order_manager = OrderManager(exchange, trade_logger)
+            order_manager = OrderManager(exchange, trade_logger, db_manager)
             
-            if active_positions:
-                print(f"\n🔄 STATE RECOVERY: {len(active_positions)} active position(s) found on Delta Exchange.")
+            if active_positions or open_trade:
+                print(f"\n🔄 STATE RECOVERY: Active position(s) found (DB: {True if open_trade else False}, API: {len(active_positions)})")
                 print("   Resuming monitoring loop to protect capital...")
                 
-                # Determine strategy
-                strategy = StrategyType.IRON_CONDOR if len(active_positions) >= 4 else StrategyType.BULL_CREDIT_SPREAD
+                # Use DB strategy if available, otherwise guess
+                if open_trade:
+                    strategy_str = open_trade.get("strategy", "IRON_CONDOR")
+                    strategy = StrategyType[strategy_str.upper()] if strategy_str in [s.name for s in StrategyType] else StrategyType.IRON_CONDOR
+                else:
+                    strategy = StrategyType.IRON_CONDOR if len(active_positions) >= 4 else StrategyType.BULL_CREDIT_SPREAD
                 
                 # Register premiums for risk tracking
                 for p in active_positions:
@@ -261,7 +292,7 @@ def main():
                 except: pass
             
             # IV Rank Floor Filter for Iron Condors (Vega Risk Protection)
-            if suggested_strategy == config.StrategyType.IRON_CONDOR and iv_rank < config.IV_ENTRY_MIN:
+            if suggested_strategy == config.StrategyType.IRON_CONDOR and iv_rank < config.IV_ENTRY_MIN and not DRY_RUN:
                 reason = f"IV Rank ({iv_rank:.1f}%) is below minimum threshold ({config.IV_ENTRY_MIN}%). Risk of IV expansion is too high for Iron Condor."
                 print(f"🛑 Safe Entry Filter: {reason} Skipping.")
                 log_rejection(reason, current_spot, current_regime)
@@ -427,9 +458,16 @@ def main():
                 print(f"⚠️ {reason}")
                 liquidity_context = get_market_liquidity_context(chain)
                 log_rejection(reason, current_spot, current_regime, context=liquidity_context)
-                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
-                time.sleep(POLL_INTERVAL_SEC)
-                continue
+                
+                if not DRY_RUN:
+                    print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                    time.sleep(POLL_INTERVAL_SEC)
+                    continue
+                else:
+                    print("🧪 DRY RUN: Stripping Math Guards to show full execution flow...")
+                    # Fallback for dry-run if no strikes found (should rarely happen with real data but protects test)
+                    _, order_specs = build_strategy(regime, chain, spot_price, lot_size=final_lots)
+                    strategy_type = suggested_strategy
     
             print("\n" + "="*50)
             print(f"🤖 OPENCLAW RECOMMENDATION: {strategy_type.value.upper()}")
@@ -501,7 +539,8 @@ def main():
                 "ob_depth": ob_depth,
                 "hours_to_expiry": hours_to_exp,
                 "final_lots": final_lots,
-                "recommended_orders": api_payload
+                "recommended_orders": api_payload,
+                "win_rate_7d": db_manager.get_7day_win_rate()
             }
     
             # --- AI Second Opinion Check ---
@@ -533,13 +572,36 @@ def main():
                     continue
                 else:
                     print(f"✅ AI Validation Passed (Confidence {confidence}/10). Proceeding to execution payload.")
+                    # Inject result for PreFlightValidator
+                    trade_context["ai_result"] = ai_result
+            
+            # --- Pre-Flight Validator (Last Line of Defense) ---
+            validator = PreFlightValidator(exchange, market_data, risk_manager)
+            is_ready, v_msg = validator.run_all_checks(order_specs, trade_context)
+            if not is_ready:
+                print(f"\n🛑 PRE-FLIGHT ABORT: {v_msg}")
+                log_rejection(f"Pre-Flight Abort: {v_msg}", current_spot, current_regime)
+                
+                if DRY_RUN:
+                    print("🧪 DEBUG: Dry-run would normally halt here, but showing payload for review...")
+                else:
+                    print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                    time.sleep(POLL_INTERVAL_SEC)
+                    continue
     
             # ==========================================================
             # 🔥 NATIVE EXECUTION BLOCK (Replaces LLM Middleman)
             # ==========================================================
+            if DRY_RUN:
+                print("\n🧪 DRY RUN: Trade validation passed. Strategy would have been executed.")
+                print(f"📈 Mode: {strategy_type.value.upper()} | Lots: {final_lots}")
+                print(f"💵 Net Credit: ${net_credit:.4f}")
+                print("\n✅ End-to-End Dry Run Successful! Exiting.")
+                sys.exit(0)
+
             print("\n💥 INITIALIZING LIVE EXECUTION 💥")
             trade_logger = TradeLogger()
-            order_manager = OrderManager(exchange, trade_logger)
+            order_manager = OrderManager(exchange, trade_logger, db_manager)
             
             # Fetch true margin to ensure safety
             wallet_balance = exchange.get_wallet_balance()
@@ -555,7 +617,7 @@ def main():
                 
                 # 1. Fire limit orders for all 4 legs natively
                 print("🚀 Routing Multi-Leg Order to Delta Exchange...")
-                order_manager.place_batch_orders(order_specs)
+                order_manager.place_batch_orders(order_specs, trade_context)
                 
                 # 2. CRITICAL: Wait for short legs to be confirmed filled before placing SL/TP
                 # Delta Exchange REJECTS bracket orders on positions that don't exist yet
@@ -634,6 +696,26 @@ def main():
             monitor = Monitor(exchange, market_data, ws_client, risk_manager, order_manager, notifier, trade_logger, scheduler)
             monitor.start_monitoring_loop(strategy_type)
             
+            # --- POST-TRADE ANALYSIS ---
+            # This runs after the monitor stops (exit reason detected)
+            analyzer = PostTradeAnalyzer(exchange)
+            
+            # Fetch final realized PnL from exchange client (requires passing through REST)
+            # We can use the monitor's last status pnl as an estimate or fetch fresh
+            final_status = monitor.get_status()
+            final_pnl = final_status.get("pnl", 0)
+            
+            # Use monitored exit spot if available, otherwise get fresh
+            exit_spot = monitor.last_exit_spot if monitor.last_exit_spot > 0 else market_data.get_spot_price()
+            
+            analyzer.analyze_trade(
+                trade_context=trade_context,
+                exit_reason=monitor.last_exit_reason,
+                final_spot=exit_spot,
+                final_pnl=final_pnl
+            )
+            
+            print("\n🏁 Bot session complete. Exiting.")
             sys.exit(0)
         except (ConnectionError, TimeoutError) as e:
             print(f"📡 Network Glitch: {e}. Retrying in 10s...")

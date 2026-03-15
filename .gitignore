@@ -23,3 +23,7 @@ trade_log.csv
 Thumbs.db
 .DS_Store
 .trade_lock
+
+# Database
+data/
+*.db

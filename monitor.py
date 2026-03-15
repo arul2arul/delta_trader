@@ -47,6 +47,8 @@ class Monitor:
         self._strategy_type: StrategyType = StrategyType.IRON_CONDOR
         self._last_check = ""
         self._ws_mode = False
+        self.last_exit_reason = "MANUAL"
+        self.last_exit_spot = 0.0
 
     def start_monitoring_loop(
         self,
@@ -182,6 +184,8 @@ class Monitor:
                 pnl=details.get("unrealized_pnl", 0),
                 notes="Kill switch activated",
             )
+            self.last_exit_reason = "STOP_LOSS_HIT" # Kill switch is the hard stop loss
+            self.last_exit_spot = details.get("current_price", 0)
             self._running = False
 
         elif action == RiskAction.PAYDAY:
@@ -194,6 +198,8 @@ class Monitor:
                 pnl=details.get("total_pnl", 0),
                 notes="PayDay profit target reached",
             )
+            self.last_exit_reason = "TARGET_REACHED" # Payday is TP
+            self.last_exit_spot = details.get("current_price", 0)
             self._running = False
 
         elif action == RiskAction.ROLL_LEG:
