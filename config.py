@@ -116,8 +116,8 @@ TIMEZONE = "Asia/Kolkata"
 DEPLOY_HOUR = 10            # 10:00 AM IST deployment
 DEPLOY_MINUTE = 0
 DEPLOY_WINDOW_MINUTES = 2   # ±2 min tolerance
-TRADING_DAYS = [0, 1, 2, 3] # Mon=0, Tue=1, Wed=2, Thu=3
-WEEKEND_SHUTDOWN_DAY = 4    # Friday
+TRADING_DAYS = [0, 1, 2, 3, 4] # Mon=0, Tue=1, Wed=2, Thu=3, Fri=4
+WEEKEND_SHUTDOWN_DAY = 4       # Friday — trading allowed until WEEKEND_SHUTDOWN_HOUR
 WEEKEND_SHUTDOWN_HOUR = 17  # 5:00 PM IST
 WEEKEND_RESUME_DAY = 0      # Monday
 WEEKEND_RESUME_HOUR = 9     # 9:00 AM IST
