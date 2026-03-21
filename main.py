@@ -25,7 +25,7 @@ from exchange_client import ExchangeClient
 from market_data import MarketData
 from ws_client import WebSocketClient
 from indicators import compute_all
-from regime_detector import detect_regime, check_volatility, get_strategy_for_regime
+from regime_detector import detect_regime, check_volatility, get_strategy_for_regime, confirm_regime
 from strategy_engine import build_strategy
 from order_manager import OrderManager
 from risk_manager import RiskManager
@@ -171,6 +171,27 @@ class DeltaTrader:
         # 4. State Recovery Check
         self._recover_state()
 
+        # 5. Warn if startup is after the deploy window (10:02 AM IST)
+        now = datetime.now(self.ist)
+        deploy_deadline_hour = config.DEPLOY_HOUR
+        deploy_deadline_minute = config.DEPLOY_MINUTE + config.DEPLOY_WINDOW_MINUTES
+        if (
+            self.scheduler.is_trading_day(now)
+            and (now.hour > deploy_deadline_hour or
+                 (now.hour == deploy_deadline_hour and now.minute > deploy_deadline_minute))
+            and now.hour < 18  # before market close
+        ):
+            logger.warning(
+                f"⚠️  Bot started at {now.strftime('%H:%M')} IST — the {config.DEPLOY_HOUR:02d}:{config.DEPLOY_MINUTE:02d} AM "
+                f"deploy window has already passed. No new trade will be deployed today unless positions were recovered. "
+                f"Consider using analyze_0dte.py for a 12 PM–1:45 PM deployment window instead."
+            )
+            self.notifier.send_alert(
+                f"⚠️ *Late Start Warning*\nBot started at {now.strftime('%H:%M')} IST. "
+                f"Deploy window ({config.DEPLOY_HOUR:02d}:{config.DEPLOY_MINUTE:02d} AM) already passed — "
+                f"no fresh deployment today unless positions were recovered."
+            )
+
         logger.info(f"✅ Preflight checks PASSED (balance: ₹{balance:,.2f})")
         return True
 
@@ -184,41 +205,61 @@ class DeltaTrader:
         logger.info("=" * 50)
 
         try:
-            # Step 1: Fetch candles
-            logger.info("Step 1: Fetching hourly candles...")
-            df = self.market_data.get_hourly_candles()
+            # Step 1: Fetch candles (1H and 15m for multi-TF confirmation)
+            logger.info("Step 1: Fetching candles (1H + 15m)...")
+            df = self.market_data.get_candles(resolution="1h")
             if df.empty:
                 logger.error("No candle data available. Aborting deployment.")
                 self.notifier.send_error_alert("No candle data for deployment")
                 return False
+            df_15m = self.market_data.get_candles(resolution="15m", count=60)
+            if df_15m.empty:
+                logger.warning("No 15m candle data. Falling back to 1H-only regime.")
+                df_15m = df.copy()
 
-            # Step 2: Compute indicators
+            # Step 2: Compute indicators on both timeframes
             logger.info("Step 2: Computing technical indicators...")
             df = compute_all(df)
+            df_15m = compute_all(df_15m)
 
-            # Step 3: Detect regime
-            logger.info("Step 3: Detecting market regime...")
-            regime = detect_regime(df)
+            # Step 3: Fetch live market signals (funding rate, OB imbalance)
+            logger.info("Step 3: Fetching live market signals...")
+            funding_rate = self.market_data.get_funding_rate()
+            ob_imbalance = self.market_data.get_orderbook_imbalance("BTCUSD")
+            supertrend_dir_15m = int(df_15m.iloc[-1].get("supertrend_dir", 1)) if not df_15m.empty else 1
 
-            # Step 4: Fetch option chain
-            logger.info("Step 4: Fetching option chain...")
+            # Step 4: Multi-TF regime confirmation
+            logger.info("Step 4: Detecting market regime (multi-TF)...")
+            regime_1h = detect_regime(df)
+            regime_15m = detect_regime(df_15m)
+            regime = confirm_regime(regime_1h, regime_15m)
+
+            # Step 5: Fetch option chain
+            logger.info("Step 5: Fetching option chain...")
             chain = self.market_data.get_option_chain()
             if not chain:
                 logger.error("No option chain data. Aborting deployment.")
                 self.notifier.send_error_alert("No option chain for deployment")
                 return False
 
-            # Step 5: Check IV Rank for wing width
-            logger.info("Step 5: Checking IV rank...")
+            # Step 5b: Check IV Rank for wing width
+            logger.info("Step 5b: Checking IV rank...")
             iv_rank = self.market_data.get_iv_rank(chain)
             wide_wings = check_volatility(iv_rank)
 
-            # Step 5b: Fetch Spot Price for Delta $500 distance rule
-            logger.info("Step 5b: Fetching spot price...")
+            # Step 5c: Fetch Spot Price for Delta $500 distance rule
+            logger.info("Step 5c: Fetching spot price...")
             spot_price = self.market_data.get_spot_price()
 
             # Step 6: Build strategy (Dry Run for dynamic lots)
             logger.info("Step 6: Building strategy (Dry Run for dynamic lots)...")
+            # Determine strategy type using live sentiment
+            self._current_strategy_type_for_log = get_strategy_for_regime(
+                regime,
+                funding_rate=funding_rate,
+                ob_imbalance=ob_imbalance,
+                supertrend_dir=supertrend_dir_15m,
+            )
             _, dry_run_specs = build_strategy(
                 regime=regime,
                 chain=chain,
@@ -259,7 +300,7 @@ class DeltaTrader:
                 chain=chain,
                 spot_price=spot_price,
                 wide_wings=wide_wings,
-                lot_size=final_lots
+                lot_size=final_lots,
             )
 
             # Step 7: Validate margin
