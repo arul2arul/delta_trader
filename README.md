@@ -1,66 +1,178 @@
-# Operation Daily Profit: 0 DTE Delta Options Trader
+# Operation Daily Profit: 0-DTE Delta Options Trader
 
-This repository contains a highly conservative, quantitative 0-DTE (Zero Days to Expiration) crypto options trading bot designed specifically for the **Delta Exchange API**.
-
-The architecture is entirely self-contained within Python:
-
-1. **The Math Engine:** Analyzes real-time market data, checks heavy mathematical constraints, and selects the exact strikes.
-2. **The Execution & Notification Engine:** Natively routes API calls to Delta Exchange in milliseconds securely, and uses the Telegram API to send execution receipts directly to your phone.
+A conservative, quantitative 0-DTE (Zero Days to Expiration) BTC options trading bot for **Delta Exchange India**. Deploys Iron Condors or Credit Spreads daily, monitored in real-time, with an AI circuit breaker powered by Gemini.
 
 ---
 
-## 1. How the Python Code Works (The Brain)
+## Quick Start (Windows Laptop Setup)
 
-The core logic resides in `analyze_0dte.py`. This script runs as a continuous polling daemon between 12:00 PM and 1:45 PM IST.
+### Step 1 — Prerequisites
 
-### The Flow of Execution
+- Python 3.11 or 3.12 installed and added to PATH
+- Git installed
+- A Delta Exchange India account with API access enabled
+- A Telegram bot (create via [@BotFather](https://t.me/BotFather)) and your Chat ID
+- A Google Gemini API key (free tier works: [aistudio.google.com](https://aistudio.google.com))
 
-1. **State Check:** Before looking at market data, it checks the Delta API. If an open position already exists, it aborts immediately to prevent double-entries.
-2. **Data Aggregation:** It downloads the current spot price, 15-minute, and 1-Hour candles.
-3. **Indicator Computation:** It calculates RSI, ADX, ATR, VWAP, EMA-9, and Supertrend.
-4. **Regime Detection:** It looks at RSI & ADX to label the market as `SIDEWAYS`, `BULLISH`, or `BEARISH`.
-5. **Strict Pre-Entry Checks:** It passes the market data through heavily constrained safety checks. If *any* check fails, it safely goes to sleep for 5 minutes and tries again.
-6. **AI Second Opinion:** If all mathematical checks pass, it packages the market context and asks the `gemini-2.5-flash` LLM for a qualitative safety check.
-7. **Native Execution & Alerting:** It uses `order_manager.py` to seamlessly submit the Limit/Market orders + instant bracket Stop-Losses, and then fires a Telegram notification receipt to your phone instantly.
+### Step 2 — Clone and Install
 
-### The Quantitative Pre-Entry Criteria (Safety Checks)
+```bat
+git clone https://github.com/arul2arul/delta_trader.git
+cd delta_trader
+pip install -r requirements.txt
+```
 
-The bot is designed to err on the side of NOT trading. A trade is only generated if it passes:
+### Step 3 — Configure API Keys
 
-* **ATR Spike Filter:** The current 1H ATR cannot be > 20% higher than the 3-day trailing average (blocks trading during sudden high volatility events).
-* **60m Consolidation Filter:** The High/Low range of the last hour must be < $400 (ensures the market is actually settling before sideways strategies are deployed).
-* **Trend Anchor Ban:** If the price dropped by more than $250 in the last 4 hours, all Bull Put Spreads are banned. If it rose by more than $250, Bear Call Spreads are banned.
-* **Supertrend Filter:** Blocks Bull Put spreads if the 15-minute Supertrend is physically Red.
-* **Funding Rate Trigger:** At 1:30 PM IST, if the funding rate is heavily positive (>0.0005) it bans Bull trades. If heavily negative, it bans Bear trades.
-* **Fee-Aware Filter:** Bounces the final trade if the net credit collected per contract is less than roughly $15 to prevent "working to pay exchange fees."
+Run the interactive setup wizard. It will ask for each key and write a `.env` file:
+
+```bat
+python setup.py
+```
+
+You will be prompted for:
+| Key | Where to find it |
+|---|---|
+| `DELTA_API_KEY` | Delta Exchange India → Account → API Keys |
+| `DELTA_API_SECRET` | Same page (shown only once at creation) |
+| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) → `/newbot` |
+| `TELEGRAM_CHAT_ID` | Send any message to your bot, then visit `https://api.telegram.org/bot<TOKEN>/getUpdates` |
+| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Get API Key |
+
+> **Testnet vs Production:** The setup wizard also asks if you want to use the testnet. Start with testnet (`USE_TESTNET=true`) to verify everything works before going live.
+
+### Step 4 — Verify Everything Works
+
+Run the health check script. This validates all API keys and connectivity **without placing any trade**:
+
+```bat
+python test_connectivity.py
+```
+
+Expected output if everything is correctly configured:
+```
+── Environment Variables ─────────────────────────────
+  ✔ PASS  DELTA_API_KEY       Set (abc123...)
+  ✔ PASS  DELTA_API_SECRET    Set (xyz789...)
+  ✔ PASS  TELEGRAM_BOT_TOKEN  Set (110234...)
+  ✔ PASS  TELEGRAM_CHAT_ID    Set (987654...)
+  ✔ PASS  GEMINI_API_KEY      Set (AIzaSy...)
+
+── Telegram Bot API ──────────────────────────────────
+  ✔ PASS  Bot Token valid              Bot username: @YourBot
+  ✔ PASS  Message delivery to Chat ID  Test message sent!
+
+── Delta Exchange API ────────────────────────────────
+  ✔ PASS  API Key authentication       Wallet balance fetched successfully
+  ✔ PASS  Wallet balance               Balance: ₹90,000.00
+  ✔ PASS  Market data (Spot Price)     BTC Spot: $84,500.00
+  ✔ PASS  Positions endpoint           Active positions: 0
+
+── Google Gemini AI API ──────────────────────────────
+  ✔ PASS  Gemini API key valid         gemini-2.5-flash responded correctly
+
+──────────────────────────────────────────────────────
+  ALL 13 CHECKS PASSED — System is ready to trade!
+──────────────────────────────────────────────────────
+```
+
+You will also receive a Telegram message confirming delivery.
+
+### Step 5 — Automate with Windows Task Scheduler
+
+The `run_bot.bat` script automatically runs the health check first, then starts the trading bot only if all checks pass.
+
+1. Open **Task Scheduler** → `Create Basic Task`
+2. Set the trigger to **Daily at 11:00 AM**
+3. Set the action to: **Start a program**
+   - Program: `C:\path\to\delta_trader\run_bot.bat`
+4. Check **"Run whether user is logged on or not"** and **"Run with highest privileges"**
+5. Under **Conditions**, uncheck "Start only if the computer is on AC power" if on a laptop
+
+That's it. Every day at 11:00 AM:
+- `run_bot.bat` runs the health check
+- If all checks pass, `analyze_0dte.py` starts automatically
+- You get a Telegram message confirming the bot is live
+- All output is logged to `automation_log.txt` in the project folder
 
 ---
 
-## 2. The AI Assessment (`ai_validator.py`)
+## Daily Workflow (Once Running)
 
-To prevent the mathematical algorithm from missing real-world macroeconomic context, the Python Brain uses a **Hybrid Quantitative + Qualitative** architecture.
+| Time (IST) | What happens |
+|---|---|
+| 11:00 AM | Laptop starts, Task Scheduler launches `run_bot.bat` |
+| 11:00–11:45 AM | Health check runs, bot polls market data, pre-entry filters evaluated |
+| ~12:00 PM | Trade deployed if all filters + AI approval pass |
+| 12:00 PM–3:30 PM | Bot monitors position in real-time, risk manager active |
+| On target hit | Telegram alert: "PAYDAY — position closed at profit" |
+| On stop hit | Telegram alert: "KILL — daily loss limit reached" |
+| 5:00 PM Friday | Trading halted for weekend |
+| 9:00 AM Monday | Trading resumes automatically |
 
-Right before issuing a real trade payload, the Python code calls the `gemini-2.5-flash` LLM API.
+> **No manual action needed during the day.** The bot handles entry, monitoring, and exit autonomously.
 
-* It feeds the model the exact quantitative state (e.g., Spot Price, ATR, 4H Momentum vector, Funding rate, and Proposed Strategy).
-* It asks Gemini to score the trade setup from 1 to 10 and write a 2-sentence rationale.
-* **The Kill Switch:** If Gemini gives the mathematical setup a score of `<= 5` (e.g., it senses a flash crash or bizarre contradiction the math missed), the Python script literally aborts its own trade.
-* If the score is valid, it appends the written rationale into the JSON payload.
+---
 
-## 3. Autonomous Execution & Telegram Notification
+## How It Works
 
-The system is designed to run 100% autonomously without any "human-in-the-loop" approval needed, bypassing LLM agents entirely.
+### Execution Flow
 
-### Execution Safety
+1. **State check** — abort if an open position already exists (prevents double-entry)
+2. **Data aggregation** — spot price + 1H and 15m candles via `market_data.py`
+3. **Indicator computation** — RSI, EMA, ADX, ATR, VWAP, Supertrend via `indicators.py`
+4. **Regime classification** — both timeframes must agree: SIDEWAYS / BULLISH / BEARISH
+5. **Pre-entry filters** — ATR spike, 60m consolidation, trend anchor ban, Supertrend direction, funding rate acceleration, fee-aware credit floor
+6. **Strategy construction** — Iron Condor (SIDEWAYS) or Credit Spread (directional)
+7. **Pre-flight validation** — capital sufficiency, clock sync (<2s drift), L2 slippage
+8. **AI second opinion** — Gemini 2.5-Flash scores the setup 1–10; score ≤ 5 aborts the trade
+9. **Order execution** — batch limit orders + bracket SL/TP submitted atomically
+10. **Monitoring loop** — real-time PnL via WebSocket; risk manager evaluates KILL / PAYDAY / HOLD each cycle
 
-When `analyze_0dte.py` finds a trade:
+### Strategies
 
-1. It instantly fetches your wallet balance via `exchange_client.py` and calculates margin requirements safely.
-2. It natively batch-submits the exact Limit/Market orders to Delta without resting failures.
-3. **CRITICAL:** Instantly after submitting the trade, it uses `order_manager.py` to place **Hard Stop Loss** and **Take Profit** bracket orders natively on Delta Exchange servers, guaranteeing you are never left with naked options overnight even if your laptop/VM loses internet.
+| Market Regime | Strategy | Structure |
+|---|---|---|
+| SIDEWAYS | Iron Condor | SELL 0.10Δ call + SELL 0.10Δ put + BUY 0.05Δ wings |
+| BULLISH | Bull Put Spread | SELL 0.15Δ put + BUY 0.05Δ put (lower) |
+| BEARISH | Bear Call Spread | SELL 0.15Δ call + BUY 0.05Δ call (higher) |
 
-### Telegram Receipts
+### Risk Controls
 
-Instead of relying on third-party services, `notifier.py` connects directly to the Telegram API. Every time the bot successfully places an Iron Condor or Credit Spread, it will ping your phone with a receipt detailing the Exact Strategy, Net Credit collected, Spot Price at entry, and the AI's Rationale.
+| Control | Setting |
+|---|---|
+| Daily loss kill-switch | -₹4,500 (5% of ₹90,000 capital) |
+| Per-leg stop | 2.5× entry premium collected |
+| Profit target | ₹500 (scales to ₹2,000 over winning days) |
+| IV expansion guard | Close position if short-leg mark price rises 30%+ |
+| Gamma risk guard | Block entry if aggregate gamma risk exceeds net credit |
+| Open Interest floor | Skip strikes with OI < 10 (illiquid exit risk) |
+| Consecutive loss circuit breaker | Suspend trading after 2 back-to-back losing days |
+| AI kill-switch | Gemini score ≤ 5 aborts the trade regardless of math |
 
-You do not need to click "Yes" – the bot is fully self-sufficient.
+---
+
+## Useful Scripts
+
+| Script | Purpose |
+|---|---|
+| `python test_connectivity.py` | Validate all API keys and connections |
+| `python analyze_0dte.py --dry-run` | Full simulation — no real orders placed |
+| `python bot_status.py` | Live dashboard showing current position and PnL |
+| `python check_strategy.py` | Check today's market regime and proposed strategy |
+| `python cancel_all.py` | Emergency: cancel all open orders immediately |
+| `python check_pos.py` | Inspect live positions |
+| `python test_all.py` | Run the full unit test suite (no API keys needed) |
+
+---
+
+## Configuration
+
+All tunable parameters are in `config.py`:
+
+- **Capital:** `TOTAL_CAPITAL_INR = 90_000`
+- **Trading days:** Monday–Friday (`TRADING_DAYS = [0,1,2,3,4]`)
+- **Deploy window:** 10:00–10:02 AM IST (use `analyze_0dte.py` directly for 11 AM+ starts)
+- **Polling interval:** 120s Iron Condor, 60s Credit Spread
+
+To switch from testnet to production, set `USE_TESTNET=false` in your `.env` file.
