@@ -78,6 +78,20 @@ Expected output if everything is correctly configured:
 
 You will also receive a Telegram message confirming delivery.
 
+**What the health check validates:**
+
+| Check | What it confirms |
+|---|---|
+| `.env` keys present | All 5 keys are set and not left as placeholder values |
+| Telegram token | Bot token is accepted by the Telegram API |
+| Telegram message delivery | Sends a real test message — you will see it arrive on your phone |
+| Delta Exchange connectivity | REST API endpoint is reachable |
+| Delta API authentication | Wallet balance fetched successfully (proves key + secret are correct) |
+| Wallet balance | Balance is > 0 and you are connected to the right environment (testnet vs production) |
+| Market data | Spot price endpoint responds (public, no auth required) |
+| Positions endpoint | Trading-scope API permission is granted on your key |
+| Gemini AI key | Sends a tiny test prompt to gemini-2.5-flash and confirms a valid response — uses negligible tokens, no meaningful cost |
+
 ### Step 5 — Automate with Windows Task Scheduler
 
 The `run_bot.bat` script automatically runs the health check first, then starts the trading bot only if all checks pass.
