@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 import config
 
@@ -63,6 +64,13 @@ class DatabaseManager:
                     FOREIGN KEY (trade_id) REFERENCES trades(trade_id)
                 )
             """)
+
+            # Safe migration: add exit_reason column if it doesn't exist yet (Task 8)
+            try:
+                cursor.execute("ALTER TABLE trades ADD COLUMN exit_reason TEXT DEFAULT 'UNKNOWN'")
+            except Exception:
+                pass  # Column already exists
+
             conn.commit()
             logger.info(f"Database initialized at {DB_PATH}")
 
@@ -88,14 +96,14 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("UPDATE trades SET status = ? WHERE trade_id = ?", (status, trade_id))
 
-    def close_trade(self, trade_id, exit_spot, final_pnl_inr):
+    def close_trade(self, trade_id, exit_spot, final_pnl_inr, exit_reason="UNKNOWN"):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE trades 
-                SET exit_spot = ?, final_pnl_inr = ?, status = 'CLOSED' 
+                UPDATE trades
+                SET exit_spot = ?, final_pnl_inr = ?, status = 'CLOSED', exit_reason = ?
                 WHERE trade_id = ?
-            """, (exit_spot, final_pnl_inr, trade_id))
+            """, (exit_spot, final_pnl_inr, exit_reason, trade_id))
 
     def add_ai_retrospective(self, trade_id, confidence, critique, liquidity_score):
         with self._get_connection() as conn:
@@ -126,13 +134,51 @@ class DatabaseManager:
             cursor = conn.cursor()
             seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("""
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN final_pnl_inr > 0 THEN 1 ELSE 0 END) as wins
-                FROM trades 
+                FROM trades
                 WHERE status = 'CLOSED' AND timestamp > ?
             """, (seven_days_ago,))
             total, wins = cursor.fetchone()
             if not total:
                 return 0.0
             return (wins / total) * 100
+
+    def get_consecutive_loss_days(self) -> int:
+        """
+        Count consecutive recent trading days that ended with a net loss.
+        Groups all closed trades by calendar date, sums PnL per day, and
+        walks backwards from the most recent day counting the losing streak.
+        Returns the streak length (0 if the last completed day was profitable).
+        """
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DATE(timestamp) as trade_date, final_pnl_inr
+                FROM trades
+                WHERE status = 'CLOSED'
+                ORDER BY timestamp DESC
+                LIMIT 20
+            """)
+            rows = cursor.fetchall()
+
+        if not rows:
+            return 0
+
+        daily_pnl = defaultdict(float)
+        day_order = []
+        for row in rows:
+            d = row["trade_date"]
+            if d not in daily_pnl:
+                day_order.append(d)
+            daily_pnl[d] += row["final_pnl_inr"] or 0
+
+        consecutive = 0
+        for day in day_order:
+            if daily_pnl[day] < 0:
+                consecutive += 1
+            else:
+                break
+        return consecutive

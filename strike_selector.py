@@ -62,7 +62,17 @@ def select_best_strike(
         # 2. Enforce strict maximum delta risk (e.g. 0.15)
         if opt_delta > max_delta:
             continue
-            
+
+        # 2.5 Open Interest floor — skip illiquid strikes (Task 7)
+        oi = float(opt.get("open_interest", 0))
+        min_oi = getattr(config, "MIN_OPEN_INTEREST", 10)
+        if oi > 0 and oi < min_oi:
+            logger.warning(
+                f"Strike {strike_price} rejected: OI={oi:.0f} < minimum {min_oi}. "
+                "Illiquid exit risk too high."
+            )
+            continue
+
         bid = float(opt.get("best_bid", 0))
         ask = float(opt.get("best_ask", 0))
         mark = float(opt.get("mark_price", 0))

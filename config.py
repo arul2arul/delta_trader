@@ -56,6 +56,34 @@ STOPLOSS_MULTIPLIER = 2.5   # Per-leg stop: 2.5× premium collected
 TARGET_DAILY_NET = 1_000    # Initial manual target
 
 # ──────────────────────────────────────────────
+# Gamma Risk Guard (Task 1)
+# ──────────────────────────────────────────────
+# Block entry if aggregate short-leg gamma risk (Γ × spot × 0.001 per lot)
+# exceeds this multiple of the net credit collected for the whole position.
+GAMMA_RISK_RATIO_THRESHOLD = 1.0
+
+# ──────────────────────────────────────────────
+# Open Interest Floor (Task 7)
+# ──────────────────────────────────────────────
+MIN_OPEN_INTEREST = 10          # Minimum OI per strike leg; avoids illiquid exit traps
+
+# ──────────────────────────────────────────────
+# Funding Rate Acceleration Guard (Task 6)
+# ──────────────────────────────────────────────
+FUNDING_RATE_ACCEL_THRESHOLD = 0.0003   # Max allowed change between polls before blocking
+
+# ──────────────────────────────────────────────
+# Patience Timer (Task 3)
+# ──────────────────────────────────────────────
+PATIENCE_DISTANCE_PCT = 0.006       # 0.6% of spot (replaces fixed $600 buffer)
+PATIENCE_TIMER_MAX_MINUTES = 15     # Hard cap: escalate to KILL after this many minutes
+
+# ──────────────────────────────────────────────
+# IV Expansion Guard (Task 4)
+# ──────────────────────────────────────────────
+IV_EXPANSION_THRESHOLD = 0.30       # 30% rise in short-leg mark price → close position
+
+# ──────────────────────────────────────────────
 # Strike Selection (Delta-based)
 # ──────────────────────────────────────────────
 SHORT_DELTA = 0.10          # Iron Condor short legs (~90% win prob)

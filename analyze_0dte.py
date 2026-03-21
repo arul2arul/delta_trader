@@ -30,7 +30,7 @@ import config
 from exchange_client import ExchangeClient
 from market_data import MarketData
 from indicators import compute_all
-from regime_detector import detect_regime, check_volatility, get_strategy_for_regime
+from regime_detector import detect_regime, check_volatility, get_strategy_for_regime, confirm_regime
 from strategy_engine import build_strategy
 from ai_validator import ask_ai_for_second_opinion
 from trade_logger import TradeLogger
@@ -100,6 +100,10 @@ def get_market_liquidity_context(chain: list[dict]) -> dict:
         "quote_count": len(spreads)
     }
 
+
+# Rolling funding-rate history for acceleration guard (Task 6).
+# Persists across polling iterations for the lifetime of this process.
+_funding_rate_history: list[float] = []
 
 TRADE_LOCK_FILE = ".trade_lock"
 
@@ -256,16 +260,48 @@ def main():
             df = compute_all(df)
             df_15m = compute_all(df_15m)
             
-            # 3. Detect Regime
-            regime = detect_regime(df)
+            # 3. Detect Regime — 1H primary + 15m confirmation (Task 5)
+            regime_1h  = detect_regime(df)
+            regime_15m = detect_regime(df_15m)
+            regime = confirm_regime(regime_1h, regime_15m)
             current_regime = regime.value
             latest = df.iloc[-1]
-            print(f"📊 Market Regimen: {regime.value.upper()}")
+            print(f"📊 Market Regime: {regime.value.upper()} (1H={regime_1h.value}, 15m={regime_15m.value})")
             print(f"   RSI: {latest['rsi']:.1f} | ADX: {latest['adx']:.1f} | ATR: {latest['atr']:.1f} | VWAP: {latest['vwap']:.1f}")
-    
-            # 4. Strategy Selection based on Regime & Fear Guage
-            suggested_strategy = get_strategy_for_regime(regime)
-            
+
+            # 4. Fetch live sentiment inputs needed for strategy selection (Task 2 & 6)
+            funding_rate  = market_data.get_funding_rate()
+            ob_imbalance  = market_data.get_orderbook_imbalance("BTCUSD")
+            ob_depth      = market_data.get_top_5_orderbook_depth("BTCUSD")
+            supertrend_dir_15m = int(df_15m.iloc[-1].get("supertrend_dir", 1))
+
+            # Funding-rate acceleration guard (Task 6)
+            # Track rolling history; block entry if rate spiked between polls.
+            _funding_rate_history.append(funding_rate)
+            if len(_funding_rate_history) > 12:          # keep ~1 hour at 5-min polls
+                _funding_rate_history.pop(0)
+            if len(_funding_rate_history) >= 2:
+                fr_accel = abs(_funding_rate_history[-1] - _funding_rate_history[-2])
+                if fr_accel > config.FUNDING_RATE_ACCEL_THRESHOLD and not DRY_RUN:
+                    reason = (
+                        f"Funding-rate acceleration ({fr_accel*100:.4f}%) exceeded "
+                        f"threshold ({config.FUNDING_RATE_ACCEL_THRESHOLD*100:.4f}%) between polls. "
+                        "Market momentum shifting rapidly — skipping entry."
+                    )
+                    print(f"🛑 Macro Guard: {reason}")
+                    log_rejection(reason, current_spot, current_regime)
+                    print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                    time.sleep(POLL_INTERVAL_SEC)
+                    continue
+
+            # 4b. Strategy Selection using live intraday sentiment (Task 2 — replaces daily F&G)
+            suggested_strategy = get_strategy_for_regime(
+                regime,
+                funding_rate=funding_rate,
+                ob_imbalance=ob_imbalance,
+                supertrend_dir=supertrend_dir_15m,
+            )
+
             # 5. Fetch Option Chain and Check Volatility
             chain = market_data.get_option_chain()
             if not chain:
@@ -367,12 +403,8 @@ def main():
             if widening_gap and regime != config.Regime.SIDEWAYS:
                 print(f"⚠️ Momentum Gap Widening (${curr_gap:.2f}). Proceed with caution.")
                 
-            # 6. Fetch Alternative Data (Sentiment & Liquidity)
-            funding_rate = market_data.get_funding_rate()
-            ob_imbalance = market_data.get_orderbook_imbalance("BTCUSD")
-            ob_depth = market_data.get_top_5_orderbook_depth("BTCUSD")
-            
-            # Immediate Math Blocking on Sentiment Extremes
+            # 6. Immediate Math Blocking on Sentiment Extremes
+            # (funding_rate / ob_imbalance / ob_depth already fetched in step 4 above)
             if funding_rate > 0.0005 and suggested_strategy == config.StrategyType.BULL_CREDIT_SPREAD:
                 reason = f"Funding Rate ({funding_rate*100:.4f}%) extremely positive. Market overheated. Blocking Bull Spread."
                 print(f"🛑 Safe Entry Filter: {reason}")
@@ -504,7 +536,33 @@ def main():
                 print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
                 time.sleep(POLL_INTERVAL_SEC)
                 continue
-            
+
+            # 7.5 Forward-looking Gamma Risk Guard (Task 1)
+            # Aggregate gamma of short legs scaled by spot and lot size (0.001 BTC per lot).
+            # If a 1% BTC move causes gamma-driven loss exceeding the total net credit, the
+            # position has negative expected value in even a mild trending environment.
+            chain_gamma_map = {c["product_id"]: c.get("gamma", 0.0) for c in chain}
+            total_short_gamma = sum(
+                chain_gamma_map.get(leg.product_id, 0.0)
+                for leg in order_specs
+                if leg.side == "sell"
+            )
+            gamma_risk_usd = total_short_gamma * spot_price * 0.001 * final_lots
+            net_credit_usd  = net_credit * 0.001 * final_lots   # scale premium to USD
+            if gamma_risk_usd > net_credit_usd * config.GAMMA_RISK_RATIO_THRESHOLD and not DRY_RUN:
+                reason = (
+                    f"Gamma Risk Guard triggered: aggregate short gamma risk "
+                    f"${gamma_risk_usd:.4f} > net credit ${net_credit_usd:.4f} "
+                    f"(threshold ×{config.GAMMA_RISK_RATIO_THRESHOLD}). "
+                    "Position likely to lose on even a moderate BTC move."
+                )
+                print(f"🛑 Gamma Guard: {reason}")
+                log_rejection(reason, current_spot, current_regime,
+                              context={"gamma_risk": gamma_risk_usd, "net_credit": net_credit_usd})
+                print(f"💤 Waiting {POLL_INTERVAL_SEC // 60}m before next check...")
+                time.sleep(POLL_INTERVAL_SEC)
+                continue
+
             # Dump raw JSON at the end for OpenClaw to parse programmatically if needed
             api_payload = []
             for leg in order_specs:

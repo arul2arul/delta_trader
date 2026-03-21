@@ -4,6 +4,7 @@ Kill switch, PayDay exit, leg-breach detection, stop-loss enforcement.
 """
 
 import logging
+from datetime import datetime
 
 import config
 from config import RiskAction
@@ -19,6 +20,7 @@ class RiskManager:
         self.positions_premium = {}  # product_id → premium collected
         self._kill_triggered = False
         self._payday_triggered = False
+        self._patience_start_time = None  # datetime when patience timer first activated
 
     def reset_daily(self):
         """Reset counters for a new trading day."""
@@ -26,6 +28,7 @@ class RiskManager:
         self.positions_premium.clear()
         self._kill_triggered = False
         self._payday_triggered = False
+        self._patience_start_time = None
         logger.info("Risk manager reset for new trading day")
 
     def register_premium(self, product_id: int, premium: float):
@@ -157,6 +160,34 @@ class RiskManager:
             return True
         return False
 
+    def check_iv_expansion(self, positions: list[dict]) -> bool:
+        """
+        IV Expansion Guard: if any short leg's current mark price has risen
+        more than IV_EXPANSION_THRESHOLD (30%) above the entry premium we collected,
+        a volatility spike is in progress — close before losses compound further.
+        """
+        threshold = getattr(config, "IV_EXPANSION_THRESHOLD", 0.30)
+        for pos in positions:
+            size = int(pos.get("size", 0))
+            if size >= 0:
+                continue  # only check short legs (negative size)
+            product_id = pos.get("product_id")
+            entry_premium = self.positions_premium.get(product_id, 0)
+            if entry_premium <= 0:
+                continue
+            current_mark = float(pos.get("mark_price", 0))
+            if current_mark <= 0:
+                continue
+            expansion = (current_mark - entry_premium) / entry_premium
+            if expansion >= threshold:
+                logger.critical(
+                    f"📈 IV EXPANSION on product {product_id}: "
+                    f"mark {current_mark:.4f} is {expansion*100:.1f}% above entry premium "
+                    f"{entry_premium:.4f} (threshold {threshold*100:.0f}%). Closing position."
+                )
+                return True
+        return False
+
     # ──────────────────────────────────────────
     # Master Evaluation
     # ──────────────────────────────────────────
@@ -198,6 +229,13 @@ class RiskManager:
                 "unrealized_pnl": unrealized_pnl,
             }
 
+        # 1.7 IV Expansion Guard (Task 4)
+        if self.check_iv_expansion(positions):
+            return RiskAction.KILL, {
+                "reason": "IV expansion: short-leg mark price rose >30% above entry premium. Volatility spike in progress.",
+                "unrealized_pnl": unrealized_pnl,
+            }
+
         # 2. PayDay Exit (Adaptive)
         if self.check_payday(total_pnl, max_profit=max_profit, hours_to_expiry=hours_to_expiry):
             return RiskAction.PAYDAY, {
@@ -205,21 +243,49 @@ class RiskManager:
                 "total_pnl": total_pnl,
             }
 
-        # 3. Leg Breach
+        # 3. Leg Breach — with hardened Patience Timer (Task 3)
         breached = self.check_leg_breach(positions, current_price)
         if breached:
-            # Check for Patience Timer
+            # Patience Timer: hold only if price is still far enough from the strike
+            # and we haven't been waiting too long. Distance is % of spot, not fixed $.
+            patience_distance = current_price * config.PATIENCE_DISTANCE_PCT
             patience_active = False
             for pos in positions:
                 size = int(pos.get("size", 0))
                 strike = float(pos.get("strike_price", 0))
-                if size < 0 and strike > 0 and abs(current_price - strike) > 600 and unrealized_pnl < 0:
+                if size < 0 and strike > 0 and abs(current_price - strike) > patience_distance and unrealized_pnl < 0:
                     patience_active = True
-            
+
             if patience_active:
-                logger.info("⏳ Patience Timer Active: Drawdown < 0 but price is >$600 from short strike. Waiting...")
+                now = datetime.now()
+                if self._patience_start_time is None:
+                    self._patience_start_time = now
+                    logger.info(
+                        f"⏳ Patience Timer started. Price is >${patience_distance:.0f} "
+                        f"({config.PATIENCE_DISTANCE_PCT*100:.1f}% of spot) from breached strike. "
+                        f"Max hold: {config.PATIENCE_TIMER_MAX_MINUTES}m."
+                    )
+
+                elapsed_minutes = (now - self._patience_start_time).total_seconds() / 60
+                if elapsed_minutes >= config.PATIENCE_TIMER_MAX_MINUTES:
+                    logger.warning(
+                        f"⏰ Patience Timer EXPIRED after {elapsed_minutes:.1f}m "
+                        f"(max {config.PATIENCE_TIMER_MAX_MINUTES}m). Escalating to KILL."
+                    )
+                    self._patience_start_time = None
+                    return RiskAction.KILL, {
+                        "reason": f"Patience Timer expired after {elapsed_minutes:.0f}m. Max hold is {config.PATIENCE_TIMER_MAX_MINUTES}m.",
+                        "total_pnl": total_pnl,
+                    }
+
+                logger.info(
+                    f"⏳ Patience Timer: {elapsed_minutes:.1f}m / {config.PATIENCE_TIMER_MAX_MINUTES}m — "
+                    f"holding, price still >${abs(current_price - strike):.0f} from strike."
+                )
                 return RiskAction.HOLD, {"reason": "Patience timer active"}
-            
+            else:
+                self._patience_start_time = None  # condition no longer met — reset
+
             return RiskAction.KILL, {
                 "reason": "Anti-Legging Logic: Leg breached, closing ALL baskets atomically.",
                 "total_pnl": total_pnl,

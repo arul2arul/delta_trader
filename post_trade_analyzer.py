@@ -76,7 +76,7 @@ class PostTradeAnalyzer:
         open_trade = self.db.get_open_trade()
         if open_trade:
             trade_id = open_trade['trade_id']
-            self.db.close_trade(trade_id, final_spot, final_pnl)
+            self.db.close_trade(trade_id, final_spot, final_pnl, exit_reason)
             
             # Log AI critique
             pre_flight_confidence = trade_context.get("ai_result", {}).get("confidence_score", 10)
@@ -145,18 +145,24 @@ class PostTradeAnalyzer:
     def _check_suspension(self):
         with open(STATE_FILE, "r") as f:
             state = json.load(f)
-        
-        if state["consecutive_losses"] >= 3:
+
+        consecutive = state["consecutive_losses"]
+        # Lowered threshold from 3 to 2: two consecutive loss days is statistically
+        # significant enough to require human review before risking more capital (Task 8).
+        if consecutive >= 2:
             state["suspend_trading"] = True
             with open(STATE_FILE, "w") as f:
                 json.dump(state, f)
-            print("🚨 CRITICAL: 3 Consecutive Losses. Trading SUSPENDED.")
-            
+            print(f"🚨 CRITICAL: {consecutive} Consecutive Losses. Trading SUSPENDED.")
+
+            loss_days = self.db.get_consecutive_loss_days()
             Notifier().send_error_alert(
-                "🚨 *BOT SUSPENDED* 🚨\n\n"
-                "The strategy has hit 3 consecutive stop-losses.\n"
-                "Trading is now PAUSED for manual review.\n\n"
-                "Please check `trade_history_master.json` for analysis."
+                f"🚨 *BOT SUSPENDED* 🚨\n\n"
+                f"The strategy has hit *{consecutive} consecutive stop-losses*.\n"
+                f"DB confirms *{loss_days} consecutive losing day(s)*.\n\n"
+                f"Trading is now *PAUSED* for manual review.\n"
+                f"To resume: review `trade_history_master.json`, fix root cause, "
+                f"then set `suspend_trading: false` in `bot_state.json`."
             )
 
     def _log_to_history(self, summary):

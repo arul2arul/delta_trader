@@ -201,6 +201,7 @@ class MarketData:
                             "vega": float(greeks.get("vega", 0)),
                             "iv": float(greeks.get("iv", 0)),
                             "volume": float(ticker.get("volume", 0)),
+                            "open_interest": float(ticker.get("open_interest", ticker.get("oi", 0))),
                         })
                 except Exception as e:
                     logger.warning(
