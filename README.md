@@ -166,6 +166,86 @@ That's it. Every day at 11:00 AM:
 
 ---
 
+## Pre-Entry Filters
+
+All filters must pass before a strategy is constructed. Any single failure aborts the trade cycle for that poll.
+
+| Filter | Threshold | What it prevents |
+|---|---|---|
+| ATR spike guard | Blocks entry if 1H ATR exceeds recent average by a significant ratio | Entering during high-volatility, erratic price action |
+| 60m consolidation check | Requires price to be in a defined range for the last 60 minutes | Entering mid-trend or after a large candle burst |
+| Trend anchor ban | Blocks Iron Condor if a strong directional trend is anchored | Selling a range structure into a trending market |
+| Supertrend direction | Must align with the chosen strategy direction | Prevents selling into the wrong side of momentum |
+| Funding rate acceleration | Change between polls must be < 0.0003 | Avoids entry when perpetual funding is accelerating (momentum signal) |
+| Fee-aware credit floor | Net credit must be > ₹3.0 after estimated fees | Ensures the trade has positive expected value after costs |
+| IV entry floor | IV Rank must be ≥ 30% for Iron Condor | Prevents selling cheap premium that can spike against you |
+| Regime consensus | Both 1H and 15m timeframes must agree on SIDEWAYS/BULLISH/BEARISH | Avoids conflicting signals across timeframes |
+| Gamma risk guard | Aggregate short-leg gamma risk must not exceed net credit collected | Controls pin risk near expiry |
+| Open Interest floor | Each strike leg must have OI ≥ 10 | Avoids illiquid strikes where exit may be impossible |
+| Pre-flight capital check | Available balance must cover estimated margin for chosen lot size | Prevents partial fills or margin calls |
+| Clock sync | System clock must be within 2 seconds of exchange time | Avoids order rejections due to timestamp drift |
+| L2 slippage check | Live order book spread must be within acceptable bounds | Ensures limit orders can fill near theoretical price |
+
+---
+
+## Max Loss: Is It Capped?
+
+**Yes — both strategies have a mathematically defined maximum loss.**
+
+### Iron Condor
+Structure: SELL 0.10Δ call + BUY 0.05Δ call (above) + SELL 0.10Δ put + BUY 0.05Δ put (below)
+
+```
+Max Loss = max(call spread width, put spread width) − net credit collected
+```
+
+The long wings (bought at 0.05Δ) cap the loss on each side. If BTC gaps through one spread entirely, the loss is limited to the spread width minus the credit received for that side.
+
+### Credit Spread (Bull Put / Bear Call)
+Structure: SELL 0.15Δ leg + BUY 0.05Δ wing
+
+```
+Max Loss = spread width − net credit collected
+```
+
+The bought wing fully caps downside. This is defined risk — there is no unlimited loss scenario.
+
+### Loss in INR Terms
+
+Each lot = 0.001 BTC. So for N lots:
+
+```
+Max Loss (INR) ≈ (spread width in USD − net credit in USD) × 0.001 × N lots × USD/INR rate
+```
+
+### Daily Loss Cap
+
+The kill-switch at **−₹4,500** (5% of ₹90,000 capital) will close the position before theoretical max loss is reached if the market moves against the trade intraday. In practice, the kill-switch fires before the spread fully expires worthless against you.
+
+---
+
+## Lot Sizing
+
+Lot size is calculated dynamically each trade using a **Safety-First** model. The system computes three independent lot caps and picks the smallest:
+
+| Constraint | Formula | Purpose |
+|---|---|---|
+| **Margin Cap** | `(usable_balance × 0.80 − fee_reserve) ÷ margin_per_lot` | Never exceed what the broker will allow |
+| **Target Cap** | `profit_target_INR ÷ (net_premium_per_BTC × 0.001 × USD_INR)` | Size only for what you need to hit the daily target |
+| **Hard Safety Cap** | `1,000 lots` | Absolute upper bound regardless of balance |
+
+The final lot size = `min(Margin Cap, Target Cap, Hard Safety Cap)`, floored at 1.
+
+**Key parameters:**
+- Margin buffer: 20% of balance kept untouched for wicks
+- Fee reserve: ₹1,000 held back for transaction costs
+- Margin per lot: estimated at `spot_price × 0.001 × 2%`
+- Profit target: starts at ₹500, scales to ₹2,000 over consecutive winning days
+
+This means the bot naturally trades fewer lots early on (small profit target → fewer lots needed) and scales up only after a winning streak is established.
+
+---
+
 ## Useful Scripts
 
 | Script | Purpose |
