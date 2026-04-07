@@ -15,6 +15,8 @@ python bot_status.py     # live dashboard
 
 Copy `.env.example` to `.env` and populate: Delta Exchange API keys, Telegram bot token, Gemini API key.
 
+On Windows, `run_bot.bat` is the recommended launcher — it activates the venv, sets the working directory, and starts `main.py`. `main.py` uses `wakepy` to prevent the OS from sleeping during a live session.
+
 ## Testing
 
 ```bash
@@ -32,6 +34,12 @@ The test suite (`test_all.py`) covers: indicators, regime detection, strike sele
 | `check_pos.py` / `check_trades.py` | Inspect live positions and recent fills |
 | `debug_api.py` / `debug_wallet.py` | Low-level API diagnostics |
 | `check_strategy.py` | Evaluate the current market regime and proposed strategy without trading |
+| `execute_0dte.py` | Standalone order execution script (bypasses the full analyze loop) |
+| `get_orders.py` | Fetch and display current open orders |
+| `status.py` | Print a summary of the current bot state |
+| `post_trade_logger.py` | Standalone post-trade log writer |
+| `patch_analyzer.py` | One-off patch/migration utility for the analyzer |
+| `inspect_sdk.py` | Inspect Delta SDK object structure for debugging |
 
 ## Architecture
 
@@ -82,6 +90,6 @@ The test suite (`test_all.py`) covers: indicators, regime detection, strike sele
 - **Atomic risk:** Bracket SL/TP orders are submitted atomically with the entry order via `order_router.py`.
 - **Crash recovery:** All trades are journaled to SQLite (`data/openclaw_vault.db`) so state can be reconstructed after a restart.
 - **Pre-entry filters:** ATR spike detection, 60-minute consolidation check, trend anchors, funding rate checks, and fee-aware PnL validation all gate order submission.
-- **Trading schedule:** Mon–Thu only; Friday shutdown at 17:00 IST; Monday resume at 09:00 IST. Deploy window is 10:00–10:02 AM IST. Polling: 120s for Iron Condor, 60s for Credit Spread.
+- **Trading schedule:** Mon–Fri; Friday shutdown at 17:00 IST; Monday resume at 09:00 IST. Deploy window is 10:00–10:02 AM IST. Polling: 120s for Iron Condor, 60s for Credit Spread.
 - **Risk thresholds (config.py):** Kill-switch at -4,500 INR daily loss (5% of 90K capital); per-leg stop at 2.5× premium collected; profit target starts at 500 INR (gradual growth to 2,000 INR goal).
 - **`--dry-run` flag:** Pass to `analyze_0dte.py` to simulate the full pipeline without submitting real orders.
